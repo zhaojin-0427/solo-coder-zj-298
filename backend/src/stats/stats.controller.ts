@@ -39,4 +39,9 @@ export class StatsController {
   getLendingStats() {
     return this.service.getLendingStats();
   }
+
+  @Get('schedule')
+  getScheduleStats(@Query('days') days?: string) {
+    return this.service.getScheduleStats(days ? parseInt(days) : 30);
+  }
 }

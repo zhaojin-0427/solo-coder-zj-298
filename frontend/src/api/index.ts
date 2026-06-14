@@ -1,5 +1,21 @@
 import axios from 'axios';
-import type { Jewelry, Outfit, Maintenance, Repair, AllStats, RiskAssessment, RiskStats, Lending, LendingStats } from '../types';
+import type {
+  Jewelry,
+  Outfit,
+  Maintenance,
+  Repair,
+  AllStats,
+  RiskAssessment,
+  RiskStats,
+  Lending,
+  LendingStats,
+  JewelryRecommendation,
+  WearPlanDetail,
+  WearPlanSummary,
+  ScheduleConflict,
+  ScheduleStats,
+  FutureJewelryPlan,
+} from '../types';
 
 const api = axios.create({
   baseURL: '/api',
@@ -16,6 +32,8 @@ export const jewelryApi = {
   getRisk: (id: number) => api.get<RiskAssessment>(`/jewelry/${id}/risk`).then((r) => r.data),
   getAllRisk: () => api.get<RiskAssessment[]>('/jewelry/risk/all').then((r) => r.data),
   getRiskStats: () => api.get<RiskStats>('/jewelry/risk/stats').then((r) => r.data),
+  getFuturePlans: (id: number) =>
+    api.get<FutureJewelryPlan[]>(`/schedule/jewelry/${id}/future`).then((r) => r.data),
 };
 
 export const outfitApi = {
@@ -45,6 +63,7 @@ export const repairApi = {
 export const statsApi = {
   all: (days = 30) => api.get<AllStats>('/stats', { params: { days } }).then((r) => r.data),
   lending: () => api.get<LendingStats>('/stats/lending').then((r) => r.data),
+  schedule: (days = 30) => api.get<ScheduleStats>('/stats/schedule', { params: { days } }).then((r) => r.data),
 };
 
 export const lendingApi = {
@@ -56,4 +75,41 @@ export const lendingApi = {
     api.put<Lending>(`/lendings/${id}/return`, data).then((r) => r.data),
   checkOverdue: () => api.get('/lendings/overdue-check').then((r) => r.data),
   delete: (id: number) => api.delete(`/lendings/${id}`).then((r) => r.data),
+};
+
+export const scheduleApi = {
+  recommend: (params: {
+    jewelryIds: number[];
+    planDate: string;
+    scenario: string;
+    outfitTags: string;
+    priority?: number;
+  }) => api.post<JewelryRecommendation[]>('/schedule/recommend', params).then((r) => r.data),
+
+  createPlan: (data: {
+    planDate: string;
+    scenario: string;
+    outfitTags: string;
+    candidateJewelryIds: number[];
+    priority?: number;
+    forbiddenConditions?: string;
+    notes?: string;
+  }) => api.post<WearPlanDetail>('/schedule', data).then((r) => r.data),
+
+  listPlans: (params?: { status?: string; fromDate?: string; toDate?: string }) =>
+    api.get<WearPlanSummary[]>('/schedule', { params }).then((r) => r.data),
+
+  getConflicts: () => api.get<ScheduleConflict[]>('/schedule/conflicts').then((r) => r.data),
+
+  getPlanDetail: (id: number) => api.get<WearPlanDetail>(`/schedule/${id}`).then((r) => r.data),
+
+  confirmPlan: (id: number, selectedJewelryIds: number[]) =>
+    api.put<WearPlanDetail>(`/schedule/${id}/confirm`, { selectedJewelryIds }).then((r) => r.data),
+
+  resolveConflict: (planId: number, jewelryId: number, newJewelryId: number, notes?: string) =>
+    api
+      .put<WearPlanDetail>(`/schedule/${planId}/resolve-conflict/${jewelryId}`, { newJewelryId, notes })
+      .then((r) => r.data),
+
+  deletePlan: (id: number) => api.delete(`/schedule/${id}`).then((r) => r.data),
 };

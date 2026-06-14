@@ -13,7 +13,8 @@ export class LendingService {
     if (activeLending) {
       throw new BadRequestException('该首饰当前已被借出，无法重复登记');
     }
-    return this.prisma.lending.create({
+
+    const result = await this.prisma.lending.create({
       data: {
         jewelryId: dto.jewelryId,
         borrowerName: dto.borrowerName,
@@ -28,6 +29,25 @@ export class LendingService {
       },
       include: { jewelry: { select: { id: true, name: true, material: true } } },
     });
+
+    const lendD = new Date(dto.lendDate);
+    const expectedReturnD = new Date(dto.expectedReturnDate);
+    await this.prisma.wearPlan.updateMany({
+      where: {
+        status: '已确认',
+        planDate: { gte: lendD, lte: expectedReturnD },
+        conflictResolved: false,
+        wearPlanItems: {
+          some: {
+            jewelryId: dto.jewelryId,
+            isSelected: true,
+          },
+        },
+      },
+      data: { conflictResolved: false },
+    });
+
+    return result;
   }
 
   async findAll(params?: { status?: string; jewelryId?: number }) {

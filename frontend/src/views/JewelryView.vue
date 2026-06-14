@@ -215,6 +215,55 @@
           <el-table-column label="问题" prop="problemType" width="100" />
           <el-table-column label="状态" prop="status" width="80" />
         </el-table>
+
+        <h3 style="margin-top: 24px" class="form-section-title">
+          <el-icon color="#a855f7"><Calendar /></el-icon>
+          未来已排期记录
+        </h3>
+        <el-table
+          :data="futurePlans"
+          size="small"
+          empty-text="暂无未来排期，可前往【智能排程】创建"
+        >
+          <el-table-column label="计划日期" width="120">
+            <template #default="{ row }">{{ formatDate(row.planDate) }}</template>
+          </el-table-column>
+          <el-table-column label="场景" prop="scenario" width="100" />
+          <el-table-column label="穿搭标签" prop="outfitTags" />
+          <el-table-column label="优先级" width="70">
+            <template #default="{ row }">
+              {{ ['', '普通', '较高', '最高'][row.priority] || '普通' }}
+            </template>
+          </el-table-column>
+          <el-table-column label="推荐分" width="80">
+            <template #default="{ row }">
+              <span
+                :style="{
+                  fontWeight: 600,
+                  color:
+                    row.recommendationScore >= 80
+                      ? '#10b981'
+                      : row.recommendationScore >= 60
+                      ? '#3b82f6'
+                      : '#f59e0b',
+                }"
+              >
+                {{ row.recommendationScore }}分
+              </span>
+            </template>
+          </el-table-column>
+          <el-table-column label="风险等级" width="100">
+            <template #default="{ row }">
+              <el-tag
+                size="small"
+                :type="getRiskTagType(row.riskLevel)"
+                effect="dark"
+              >
+                {{ row.riskLevelText }}
+              </el-tag>
+            </template>
+          </el-table-column>
+        </el-table>
       </template>
     </el-drawer>
   </div>
@@ -225,7 +274,7 @@ import { ref, reactive, onMounted, computed } from 'vue';
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
 import { Plus, Delete, Present, Location, Calendar, Warning, Bell, CircleCheck, User } from '@element-plus/icons-vue';
 import { jewelryApi } from '@/api';
-import type { Jewelry, RiskAssessment } from '@/types';
+import type { Jewelry, RiskAssessment, FutureJewelryPlan } from '@/types';
 import { calculateRiskLocally, getRiskLevelInfo, getRiskTagType } from '@/utils/risk';
 
 const jewelryList = ref<Jewelry[]>([]);
@@ -234,6 +283,7 @@ const detailVisible = ref(false);
 const editingItem = ref<Jewelry | null>(null);
 const currentDetail = ref<Jewelry | null>(null);
 const currentRisk = ref<RiskAssessment | null>(null);
+const futurePlans = ref<FutureJewelryPlan[]>([]);
 const formRef = ref<FormInstance>();
 
 const riskMap = ref<Map<number, RiskAssessment>>(new Map());
@@ -331,6 +381,11 @@ const showDetail = async (item: Jewelry) => {
     currentRisk.value = await jewelryApi.getRisk(item.id);
   } catch (e) {
     currentRisk.value = null;
+  }
+  try {
+    futurePlans.value = await jewelryApi.getFuturePlans(item.id);
+  } catch (e) {
+    futurePlans.value = [];
   }
   detailVisible.value = true;
 };

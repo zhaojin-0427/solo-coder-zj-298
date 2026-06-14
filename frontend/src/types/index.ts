@@ -223,3 +223,144 @@ export interface AllStats {
   longIdleJewelry: IdleJewelry[];
   riskStats: RiskStats;
 }
+
+export interface RecommendationFactor {
+  type: string;
+  name: string;
+  score: number;
+  maxScore: number;
+  description: string;
+}
+
+export interface JewelryRecommendation {
+  jewelryId: number;
+  jewelryName: string;
+  material: string;
+  color: string;
+  totalScore: number;
+  maxScore: number;
+  percentage: number;
+  isAvailable: boolean;
+  unavailableReasons: string[];
+  riskLevel: RiskLevel;
+  riskLevelText: string;
+  riskScore: number;
+  factors: RecommendationFactor[];
+  reminders: string[];
+}
+
+export interface PlanItemDetail {
+  id: number;
+  jewelryId: number;
+  jewelryName: string;
+  material: string;
+  recommendationScore: number;
+  riskLevel: RiskLevel;
+  riskLevelText: string;
+  riskScore: number;
+  unavailableReasons: string;
+  isAvailable: boolean;
+  isSelected: boolean;
+  factors: string;
+}
+
+export interface WearPlanDetail {
+  id: number;
+  planDate: string;
+  scenario: string;
+  outfitTags: string;
+  priority: number;
+  forbiddenConditions: string;
+  status: string;
+  confirmedAt: string;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+  items: PlanItemDetail[];
+  selectedJewelryNames: string[];
+}
+
+export interface WearPlanSummary {
+  id: number;
+  planDate: string;
+  scenario: string;
+  outfitTags: string;
+  priority: number;
+  status: string;
+  confirmedAt: string | null;
+  conflictResolved: boolean;
+  selectedJewelry: Array<{
+    id: number;
+    name: string;
+    material: string;
+  }>;
+}
+
+export interface ScheduleConflict {
+  id: number;
+  wearPlanId: number;
+  planDate: string;
+  scenario: string;
+  jewelryId: number;
+  jewelryName: string;
+  conflictType: 'lending' | 'overdue' | 'repair' | 'pending_pickup' | 'high_risk' | 'critical_risk';
+  conflictTypeText: string;
+  description: string;
+  severity: 'warning' | 'danger';
+  status: string;
+}
+
+export interface FutureJewelryPlan {
+  planId: number;
+  planDate: string;
+  scenario: string;
+  outfitTags: string;
+  priority: number;
+  recommendationScore: number;
+  riskLevel: RiskLevel;
+  riskLevelText: string;
+}
+
+export interface ScheduleCalendarItem {
+  id: number;
+  scenario: string;
+  outfitTags: string;
+  priority: number;
+  status: string;
+  jewelry: Array<{ id: number; name: string; material: string }>;
+}
+
+export interface ScheduleCalendarDay {
+  date: string;
+  dateStr: string;
+  weekday: string;
+  plans: ScheduleCalendarItem[];
+}
+
+export interface UnavailableReasonItem {
+  reason: string;
+  count: number;
+}
+
+export interface HitTrendItem {
+  period: string;
+  hitRate: number;
+  totalSelected: number;
+  hitCount: number;
+}
+
+export interface ScheduleStats {
+  overview: {
+    totalPlans: number;
+    confirmedPlans: number;
+    pendingPlans: number;
+    futurePlannedDays: number;
+    averageSelectedPerPlan: number;
+    recommendationHitRate: number;
+    unresolvedConflicts: number;
+  };
+  futureScheduleCalendar: ScheduleCalendarDay[];
+  unavailableReasonsDistribution: UnavailableReasonItem[];
+  conflicts: ScheduleConflict[];
+  recommendationHitTrend: HitTrendItem[];
+}

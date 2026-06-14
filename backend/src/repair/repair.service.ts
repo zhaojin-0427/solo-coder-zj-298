@@ -20,10 +20,33 @@ export class RepairService {
       notes: dto.notes,
     };
     if (dto.returnDate) data.returnDate = new Date(dto.returnDate);
-    return this.prisma.repair.create({
+
+    const result = await this.prisma.repair.create({
       data,
       include: { jewelry: { select: { id: true, name: true } } },
     });
+
+    if (dto.status === '维修中') {
+      const sendD = new Date(dto.sendDate);
+      const returnD = dto.returnDate
+        ? new Date(dto.returnDate)
+        : new Date(sendD.getTime() + 30 * 24 * 60 * 60 * 1000);
+      await this.prisma.wearPlan.updateMany({
+        where: {
+          status: '已确认',
+          planDate: { gte: sendD, lte: returnD },
+          wearPlanItems: {
+            some: {
+              jewelryId: dto.jewelryId,
+              isSelected: true,
+            },
+          },
+        },
+        data: { conflictResolved: false },
+      });
+    }
+
+    return result;
   }
 
   async findAll(params?: { jewelryId?: number; status?: string }) {

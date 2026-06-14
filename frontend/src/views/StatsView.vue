@@ -340,6 +340,181 @@
         </el-card>
       </el-col>
     </el-row>
+
+    <el-divider content-position="left">
+      <span class="divider-title">
+        <el-icon :size="20" color="#10b981"><Calendar /></el-icon>
+        智能排程统计
+      </span>
+    </el-divider>
+
+    <el-row :gutter="16" style="margin-bottom: 16px">
+      <el-col :xs="12" :sm="12" :md="4">
+        <div class="stat-card">
+          <el-icon :size="28" color="#10b981"><Calendar /></el-icon>
+          <div class="label">计划总数</div>
+          <div class="value">{{ scheduleStats.overview?.totalPlans || 0 }}</div>
+        </div>
+      </el-col>
+      <el-col :xs="12" :sm="12" :md="4">
+        <div class="stat-card">
+          <el-icon :size="28" color="#3b82f6"><CircleCheck /></el-icon>
+          <div class="label">已确认排期</div>
+          <div class="value">{{ scheduleStats.overview?.confirmedPlans || 0 }}</div>
+        </div>
+      </el-col>
+      <el-col :xs="12" :sm="12" :md="4">
+        <div class="stat-card">
+          <el-icon :size="28" color="#8b5cf6"><Date /></el-icon>
+          <div class="label">未来30天已排</div>
+          <div class="value">{{ scheduleStats.overview?.futurePlannedDays || 0 }}天</div>
+        </div>
+      </el-col>
+      <el-col :xs="12" :sm="12" :md="4">
+        <div class="stat-card">
+          <el-icon :size="28" color="#f59e0b"><TrendCharts /></el-icon>
+          <div class="label">推荐命中率</div>
+          <div class="value">{{ scheduleStats.overview?.recommendationHitRate || 0 }}%</div>
+        </div>
+      </el-col>
+      <el-col :xs="12" :sm="12" :md="4">
+        <div class="stat-card">
+          <el-icon :size="28" color="#ef4444"><WarningFilled /></el-icon>
+          <div class="label">待处理冲突</div>
+          <div class="value">{{ scheduleStats.overview?.unresolvedConflicts || 0 }}</div>
+        </div>
+      </el-col>
+      <el-col :xs="12" :sm="12" :md="4">
+        <div class="stat-card">
+          <el-icon :size="28" color="#ec4899"><Present /></el-icon>
+          <div class="label">场均首饰数</div>
+          <div class="value">{{ scheduleStats.overview?.averageSelectedPerPlan || 0 }}件</div>
+        </div>
+      </el-col>
+    </el-row>
+
+    <el-row :gutter="16">
+      <el-col :xs="24" :md="12" style="margin-bottom: 16px">
+        <el-card class="card chart-card" shadow="never">
+          <div class="card-header">
+            <h3><el-icon color="#ef4444"><Warning /></el-icon> 不可用首饰原因分布</h3>
+          </div>
+          <div ref="unavailableChartRef" class="chart-box"></div>
+        </el-card>
+      </el-col>
+
+      <el-col :xs="24" :md="12" style="margin-bottom: 16px">
+        <el-card class="card chart-card" shadow="never">
+          <div class="card-header">
+            <h3><el-icon color="#10b981"><TrendCharts /></el-icon> 推荐命中率趋势</h3>
+          </div>
+          <div ref="hitTrendChartRef" class="chart-box"></div>
+        </el-card>
+      </el-col>
+
+      <el-col :xs="24" style="margin-bottom: 16px">
+        <el-card class="card" shadow="never">
+          <div class="card-header">
+            <h3>
+              <el-icon color="#a855f7"><Calendar /></el-icon>
+              未来 30 天佩戴排程日历
+            </h3>
+            <el-tag type="info" effect="light" size="small">
+              共 {{ totalPlannedInCalendar }} 个计划
+            </el-tag>
+          </div>
+          <div class="stats-calendar">
+            <div
+              v-for="day in scheduleStats.futureScheduleCalendar || []"
+              :key="day.dateStr"
+              class="stats-calendar-day"
+              :class="{ 'is-today': day.dateStr === todayStr, 'has-plan': day.plans.length > 0 }"
+            >
+              <div class="stats-day-header">
+                <span class="stats-day-week">{{ day.weekday }}</span>
+                <span class="stats-day-date" :class="{ 'today-mark': day.dateStr === todayStr }">
+                  {{ day.dateStr.slice(5) }}
+                </span>
+              </div>
+              <div class="stats-day-body">
+                <div v-if="day.plans.length === 0" class="stats-day-empty">—</div>
+                <div
+                  v-for="plan in day.plans"
+                  :key="plan.id"
+                  class="stats-plan-tag"
+                  :class="'stats-priority-' + (plan.priority || 1)"
+                >
+                  <div class="stats-plan-scenario">{{ plan.scenario }}</div>
+                  <div class="stats-plan-jewelry">
+                    {{ plan.jewelry.map((j: any) => j.name).join('、') }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </el-card>
+      </el-col>
+
+      <el-col :xs="24" style="margin-bottom: 16px">
+        <el-card class="card" shadow="never">
+          <div class="card-header">
+            <h3>
+              <el-icon color="#ef4444"><WarningFilled /></el-icon>
+              计划冲突列表
+            </h3>
+            <el-tag
+              v-if="scheduleStats.conflicts && scheduleStats.conflicts.length > 0"
+              type="danger"
+              effect="dark"
+              size="small"
+            >
+              {{ pendingConflictCount }} 个待处理
+            </el-tag>
+          </div>
+          <el-table
+            :data="scheduleStats.conflicts || []"
+            size="small"
+            empty-text="太棒了！暂无计划冲突"
+          >
+            <el-table-column label="冲突等级" width="100" align="center">
+              <template #default="{ row }">
+                <el-tag
+                  :type="row.severity === 'danger' ? 'danger' : 'warning'"
+                  effect="dark"
+                  size="small"
+                >
+                  {{ row.severity === 'danger' ? '严重' : '警告' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="冲突类型" width="120">
+              <template #default="{ row }">{{ row.conflictTypeText }}</template>
+            </el-table-column>
+            <el-table-column label="计划日期" width="120">
+              <template #default="{ row }">{{ formatDate(row.planDate) }}</template>
+            </el-table-column>
+            <el-table-column label="场景" width="100" prop="scenario" />
+            <el-table-column label="首饰" width="120" prop="jewelryName" />
+            <el-table-column label="冲突描述">
+              <template #default="{ row }">
+                <span style="color: #dc2626">{{ row.description }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="状态" width="90" align="center">
+              <template #default="{ row }">
+                <el-tag
+                  :type="row.status === '待处理' ? 'danger' : 'success'"
+                  effect="light"
+                  size="small"
+                >
+                  {{ row.status }}
+                </el-tag>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-card>
+      </el-col>
+    </el-row>
   </div>
 </template>
 
@@ -361,15 +536,30 @@ import {
   DataAnalysis,
   Van,
   Money,
+  Calendar,
+  Date as DateIcon,
+  CircleCheck,
 } from '@element-plus/icons-vue';
 import { statsApi, jewelryApi } from '@/api';
-import type { AllStats, RiskStats, LendingStats } from '@/types';
+import type { AllStats, RiskStats, LendingStats, ScheduleStats } from '@/types';
 import { getRiskLevelInfo, getRiskTagType, getReminderTypeInfo } from '@/utils/risk';
 
 const idleDays = ref(30);
 const data = reactive<Partial<AllStats>>({});
 const riskStats = ref<Partial<RiskStats>>({});
 const lendingStats = reactive<Partial<LendingStats>>({});
+const scheduleStats = reactive<Partial<ScheduleStats>>({});
+
+const todayStr = computed(() => new Date().toISOString().split('T')[0]);
+const totalPlannedInCalendar = computed(() => {
+  return (scheduleStats.futureScheduleCalendar || []).reduce(
+    (sum: number, day: any) => sum + day.plans.length,
+    0,
+  );
+});
+const pendingConflictCount = computed(() => {
+  return (scheduleStats.conflicts || []).filter((c: any) => c.status === '待处理').length;
+});
 
 const maxComboCount = computed(() => {
   const items = data.topOutfitCombinations?.combinations || [];
@@ -381,20 +571,25 @@ const problemChartRef = ref<HTMLElement>();
 const comboChartRef = ref<HTMLElement>();
 const riskMaterialChartRef = ref<HTMLElement>();
 const wearChartRef = ref<HTMLElement>();
+const unavailableChartRef = ref<HTMLElement>();
+const hitTrendChartRef = ref<HTMLElement>();
 
 let materialChart: echarts.ECharts | null = null;
 let problemChart: echarts.ECharts | null = null;
 let comboChart: echarts.ECharts | null = null;
 let riskMaterialChart: echarts.ECharts | null = null;
 let wearChart: echarts.ECharts | null = null;
+let unavailableChart: echarts.ECharts | null = null;
+let hitTrendChart: echarts.ECharts | null = null;
 
 const purplePalette = ['#a855f7', '#c084fc', '#e879f9', '#8b5cf6', '#7c3aed', '#6d28d9', '#5b21b6', '#4c1d95'];
 
 const loadData = async () => {
-  const [stats, risk, lending] = await Promise.all([
+  const [stats, risk, lending, schedule] = await Promise.all([
     statsApi.all(idleDays.value),
     jewelryApi.getRiskStats().catch(() => null),
     statsApi.lending().catch(() => null),
+    statsApi.schedule(idleDays.value).catch(() => null),
   ]);
   Object.assign(data, stats);
   if (risk) {
@@ -403,10 +598,14 @@ const loadData = async () => {
   if (lending) {
     Object.assign(lendingStats, lending);
   }
+  if (schedule) {
+    Object.assign(scheduleStats, schedule);
+  }
   await nextTick();
   renderCharts();
   renderRiskCharts();
   renderLendingCharts();
+  renderScheduleCharts();
 };
 
 const renderCharts = () => {
@@ -648,6 +847,132 @@ const renderLendingCharts = () => {
   renderWearChart();
 };
 
+const renderScheduleCharts = () => {
+  renderUnavailableChart();
+  renderHitTrendChart();
+};
+
+const renderUnavailableChart = () => {
+  if (!unavailableChartRef.value) return;
+  if (!unavailableChart) {
+    unavailableChart = echarts.init(unavailableChartRef.value);
+  }
+  const items = scheduleStats.unavailableReasonsDistribution || [];
+  const unavailableColors = ['#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#3b82f6', '#8b5cf6', '#ec4899'];
+  unavailableChart.setOption({
+    tooltip: {
+      trigger: 'item',
+      formatter: '{b}: {c}次 ({d}%)',
+    },
+    legend: {
+      bottom: 0,
+      left: 'center',
+      icon: 'circle',
+      textStyle: { color: '#6b4c8a' },
+    },
+    color: unavailableColors,
+    series: [
+      {
+        name: '不可用原因',
+        type: 'pie',
+        radius: ['40%', '68%'],
+        center: ['50%', '42%'],
+        avoidLabelOverlap: false,
+        itemStyle: {
+          borderRadius: 8,
+          borderColor: '#fff',
+          borderWidth: 2,
+        },
+        label: {
+          show: true,
+          formatter: '{b}\n{c}次',
+          color: '#4c1d95',
+          fontSize: 12,
+        },
+        emphasis: {
+          label: {
+            show: true,
+            fontSize: 14,
+            fontWeight: 'bold',
+          },
+        },
+        data: items.length > 0
+          ? items.map((i: any) => ({ name: i.reason, value: i.count }))
+          : [{ name: '暂无数据', value: 1, itemStyle: { color: '#e5e7eb' }, label: { show: false } }],
+      },
+    ],
+  });
+};
+
+const renderHitTrendChart = () => {
+  if (!hitTrendChartRef.value) return;
+  if (!hitTrendChart) {
+    hitTrendChart = echarts.init(hitTrendChartRef.value);
+  }
+  const items = scheduleStats.recommendationHitTrend || [];
+  hitTrendChart.setOption({
+    tooltip: {
+      trigger: 'axis',
+      formatter: (params: any) => {
+        const p = params[0];
+        const item = items[p.dataIndex];
+        return `${item?.period || p.axisValue}<br/>命中率: ${p.value}%<br/>命中: ${item?.hitCount || 0}/${item?.totalSelected || 0}`;
+      },
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: '3%',
+      top: '10%',
+      containLabel: true,
+    },
+    xAxis: {
+      type: 'category',
+      data: items.length > 0 ? items.map((i: any) => i.period.slice(5)) : ['暂无数据'],
+      axisLabel: { color: '#6b4c8a' },
+      axisLine: { lineStyle: { color: '#e9d5ff' } },
+    },
+    yAxis: {
+      type: 'value',
+      name: '命中率(%)',
+      max: 100,
+      axisLabel: { color: '#6b4c8a', formatter: '{value}%' },
+      splitLine: { lineStyle: { color: '#f3e8ff', type: 'dashed' } },
+    },
+    series: [
+      {
+        name: '命中率',
+        type: 'line',
+        smooth: true,
+        symbol: 'circle',
+        symbolSize: 8,
+        itemStyle: { color: '#10b981' },
+        lineStyle: {
+          width: 3,
+          color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+            { offset: 0, color: '#10b981' },
+            { offset: 1, color: '#3b82f6' },
+          ]),
+        },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(16, 185, 129, 0.3)' },
+            { offset: 1, color: 'rgba(16, 185, 129, 0.02)' },
+          ]),
+        },
+        label: {
+          show: true,
+          position: 'top',
+          color: '#065f46',
+          fontWeight: 'bold',
+          formatter: '{c}%',
+        },
+        data: items.length > 0 ? items.map((i: any) => i.hitRate) : [0],
+      },
+    ],
+  });
+};
+
 const renderWearChart = () => {
   if (!wearChartRef.value) return;
   if (!wearChart) {
@@ -706,6 +1031,8 @@ const handleResize = () => {
   comboChart?.resize();
   riskMaterialChart?.resize();
   wearChart?.resize();
+  unavailableChart?.resize();
+  hitTrendChart?.resize();
 };
 
 onMounted(async () => {
@@ -720,6 +1047,8 @@ onBeforeUnmount(() => {
   comboChart?.dispose();
   riskMaterialChart?.dispose();
   wearChart?.dispose();
+  unavailableChart?.dispose();
+  hitTrendChart?.dispose();
 });
 </script>
 
@@ -1198,5 +1527,111 @@ onBeforeUnmount(() => {
 .overdue-meta {
   font-size: 12px;
   color: #7c3aed;
+}
+
+.stats-calendar {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+}
+
+@media (max-width: 900px) {
+  .stats-calendar {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 500px) {
+  .stats-calendar {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.stats-calendar-day {
+  border: 1px solid #e9d5ff;
+  border-radius: 8px;
+  min-height: 100px;
+  background: #fff;
+  transition: all 0.2s;
+  overflow: hidden;
+}
+
+.stats-calendar-day:hover {
+  border-color: #a855f7;
+}
+
+.stats-calendar-day.is-today {
+  border-color: #a855f7;
+  background: #faf5ff;
+}
+
+.stats-calendar-day.has-plan {
+  background: #fdfbff;
+}
+
+.stats-day-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px;
+  background: #f3e8ff;
+  font-size: 12px;
+}
+
+.stats-day-week {
+  color: #6b21a8;
+  font-weight: 500;
+}
+
+.stats-day-date {
+  font-weight: 600;
+  color: #1f2937;
+  font-size: 11px;
+}
+
+.today-mark {
+  color: #a855f7;
+  font-weight: 700;
+}
+
+.stats-day-body {
+  padding: 6px;
+}
+
+.stats-day-empty {
+  text-align: center;
+  color: #d1d5db;
+  font-size: 18px;
+  padding: 8px 0;
+}
+
+.stats-plan-tag {
+  background: linear-gradient(135deg, #c084fc, #a855f7);
+  color: #fff;
+  padding: 4px 6px;
+  border-radius: 4px;
+  margin-bottom: 4px;
+  font-size: 11px;
+}
+
+.stats-plan-tag.stats-priority-2 {
+  background: linear-gradient(135deg, #f97316, #ef4444);
+}
+
+.stats-plan-tag.stats-priority-3 {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+}
+
+.stats-plan-scenario {
+  font-weight: 600;
+}
+
+.stats-plan-jewelry {
+  opacity: 0.9;
+  font-size: 10px;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>

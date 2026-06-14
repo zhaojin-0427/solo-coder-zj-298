@@ -21,6 +21,7 @@ model Jewelry {
   maintenances  Maintenance[]
   repairs       Repair[]
   lendings      Lending[]
+  wearPlanItems WearPlanItem[]
 }
 
 model Outfit {
@@ -79,4 +80,42 @@ model Lending {
   notes                 String?
   createdAt             DateTime @default(now())
   jewelry               Jewelry  @relation(fields: [jewelryId], references: [id], onDelete: Cascade)
+}
+
+model WearPlan {
+  id                    Int       @id @default(autoincrement())
+  planDate              DateTime
+  scenario              String
+  outfitTags            String
+  candidateJewelryIds   String
+  selectedJewelryIds    String?
+  priority              Int       @default(1)
+  forbiddenConditions   String?
+  status                String    @default("待确认")
+  confirmedAt           DateTime?
+  conflictResolved      Boolean   @default(false)
+  recommendationSnapshot String?
+  notes                 String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  wearPlanItems         WearPlanItem[]
+}
+
+model WearPlanItem {
+  id                    Int       @id @default(autoincrement())
+  wearPlanId            Int
+  jewelryId             Int
+  recommendationScore   Int
+  riskLevel             String
+  riskLevelText         String
+  riskScore             Int
+  unavailableReasons    String?
+  isAvailable           Boolean
+  isSelected            Boolean   @default(false)
+  factors               String?
+  createdAt             DateTime  @default(now())
+  wearPlan              WearPlan  @relation(fields: [wearPlanId], references: [id], onDelete: Cascade)
+  jewelry               Jewelry   @relation(fields: [jewelryId], references: [id], onDelete: Cascade)
+
+  @@unique([wearPlanId, jewelryId])
 }

@@ -49,6 +49,27 @@ export class JewelryService {
           take: 1,
           orderBy: { lendDate: 'desc' },
         },
+        wearPlanItems: {
+          where: {
+            isSelected: true,
+            wearPlan: {
+              status: '已确认',
+              planDate: { gte: new Date() },
+            },
+          },
+          include: {
+            wearPlan: {
+              select: {
+                id: true,
+                planDate: true,
+                scenario: true,
+                outfitTags: true,
+                priority: true,
+              },
+            },
+          },
+          orderBy: { wearPlan: { planDate: 'asc' } },
+        },
       },
     });
     if (!jewelry) throw new NotFoundException('首饰不存在');
