@@ -1,0 +1,297 @@
+<template>
+  <div class="page-container">
+    <div class="page-header">
+      <h1 class="page-title">首饰档案</h1>
+      <el-button type="primary" @click="openDialog()" :icon="Plus">新增首饰</el-button>
+    </div>
+
+    <el-row :gutter="16">
+      <el-col
+        v-for="item in jewelryList"
+        :key="item.id"
+        :xs="24"
+        :sm="12"
+        :md="8"
+        :lg="6"
+        style="margin-bottom: 16px"
+      >
+        <div class="card jewelry-card" @click="showDetail(item)">
+          <div class="jewelry-avatar">
+            <el-icon :size="36" color="#a855f7"><Present /></el-icon>
+          </div>
+          <h3 class="jewelry-name">{{ item.name }}</h3>
+          <div class="jewelry-meta">
+            <el-tag size="small" effect="light">{{ item.material }}</el-tag>
+            <el-tag size="small" type="warning" effect="light">{{ item.color }}</el-tag>
+          </div>
+          <p class="jewelry-info">
+            <el-icon><Location /></el-icon>
+            <span>{{ item.storageLocation }}</span>
+          </p>
+          <p class="jewelry-info">
+            <el-icon><Calendar /></el-icon>
+            <span>{{ formatDate(item.purchaseDate) }}</span>
+          </p>
+          <div class="jewelry-stats">
+            <span>{{ item._count?.outfits || 0 }}次佩戴</span>
+            <span>{{ item._count?.maintenances || 0 }}次养护</span>
+            <span>{{ item._count?.repairs || 0 }}次维修</span>
+          </div>
+          <div class="jewelry-actions">
+            <el-button size="small" @click.stop="openDialog(item)">编辑</el-button>
+            <el-button
+              size="small"
+              type="danger"
+              :icon="Delete"
+              @click.stop="handleDelete(item)"
+            >删除</el-button>
+          </div>
+        </div>
+      </el-col>
+    </el-row>
+
+    <el-empty v-if="jewelryList.length === 0" description="暂无首饰，点击右上角添加" />
+
+    <el-dialog v-model="dialogVisible" :title="editingItem ? '编辑首饰' : '新增首饰'" width="560px">
+      <el-form :model="formData" label-width="100px" ref="formRef">
+        <div class="form-section-title">基本信息</div>
+        <el-form-item label="首饰名称" prop="name" :rules="[{ required: true, message: '请输入名称' }]">
+          <el-input v-model="formData.name" placeholder="如：心形项链" />
+        </el-form-item>
+        <el-form-item label="材质" prop="material" :rules="[{ required: true, message: '请选择材质' }]">
+          <el-select v-model="formData.material" placeholder="选择材质" style="width: 100%">
+            <el-option label="黄金" value="黄金" />
+            <el-option label="白银" value="白银" />
+            <el-option label="铂金" value="铂金" />
+            <el-option label="玫瑰金" value="玫瑰金" />
+            <el-option label="不锈钢" value="不锈钢" />
+            <el-option label="珍珠" value="珍珠" />
+            <el-option label="水晶" value="水晶" />
+            <el-option label="合金" value="合金" />
+            <el-option label="其他" value="其他" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="颜色" prop="color" :rules="[{ required: true, message: '请输入颜色' }]">
+          <el-input v-model="formData.color" placeholder="如：金色" />
+        </el-form-item>
+        <div class="form-section-title">详细信息</div>
+        <el-form-item label="购买时间" prop="purchaseDate" :rules="[{ required: true, message: '请选择日期' }]">
+          <el-date-picker v-model="formData.purchaseDate" type="date" style="width: 100%" value-format="YYYY-MM-DD" />
+        </el-form-item>
+        <el-form-item label="收纳位置" prop="storageLocation" :rules="[{ required: true }]">
+          <el-input v-model="formData.storageLocation" placeholder="如：首饰盒A格" />
+        </el-form-item>
+        <el-form-item label="适配场景" prop="suitableScenarios" :rules="[{ required: true }]">
+          <el-select
+            v-model="formData.suitableScenarios"
+            multiple
+            filterable
+            allow-create
+            default-first-option
+            style="width: 100%"
+            placeholder="选择或输入场景"
+          >
+            <el-option label="日常通勤" value="日常通勤" />
+            <el-option label="约会" value="约会" />
+            <el-option label="婚礼宴会" value="婚礼宴会" />
+            <el-option label="商务场合" value="商务场合" />
+            <el-option label="派对" value="派对" />
+            <el-option label="旅行" value="旅行" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleSubmit">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <el-drawer v-model="detailVisible" title="首饰详情" size="500px">
+      <template v-if="currentDetail">
+        <h2>{{ currentDetail.name }}</h2>
+        <el-descriptions :column="1" border style="margin-top: 16px">
+          <el-descriptions-item label="材质">{{ currentDetail.material }}</el-descriptions-item>
+          <el-descriptions-item label="颜色">{{ currentDetail.color }}</el-descriptions-item>
+          <el-descriptions-item label="购买时间">{{ formatDate(currentDetail.purchaseDate) }}</el-descriptions-item>
+          <el-descriptions-item label="收纳位置">{{ currentDetail.storageLocation }}</el-descriptions-item>
+          <el-descriptions-item label="适配场景">{{ currentDetail.suitableScenarios }}</el-descriptions-item>
+        </el-descriptions>
+
+        <h3 style="margin-top: 24px" class="form-section-title">最近佩戴记录</h3>
+        <el-table :data="currentDetail.outfits || []" size="small" empty-text="暂无佩戴记录">
+          <el-table-column label="佩戴日期" prop="wearDate">
+            <template #default="{ row }">{{ formatDate(row.wearDate) }}</template>
+          </el-table-column>
+          <el-table-column label="穿搭" prop="outfitTags" />
+          <el-table-column label="清洁" prop="cleanStatus" width="80" />
+        </el-table>
+
+        <h3 style="margin-top: 24px" class="form-section-title">最近养护记录</h3>
+        <el-table :data="currentDetail.maintenances || []" size="small" empty-text="暂无养护记录">
+          <el-table-column label="日期" prop="date">
+            <template #default="{ row }">{{ formatDate(row.date) }}</template>
+          </el-table-column>
+          <el-table-column label="类型" prop="type" width="100" />
+          <el-table-column label="描述" prop="description" />
+        </el-table>
+
+        <h3 style="margin-top: 24px" class="form-section-title">最近维修记录</h3>
+        <el-table :data="currentDetail.repairs || []" size="small" empty-text="暂无维修记录">
+          <el-table-column label="送修日期" prop="sendDate">
+            <template #default="{ row }">{{ formatDate(row.sendDate) }}</template>
+          </el-table-column>
+          <el-table-column label="问题" prop="problemType" width="100" />
+          <el-table-column label="状态" prop="status" width="80" />
+        </el-table>
+      </template>
+    </el-drawer>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, reactive, onMounted } from 'vue';
+import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
+import { Plus, Delete, Present, Location, Calendar } from '@element-plus/icons-vue';
+import { jewelryApi } from '@/api';
+import type { Jewelry } from '@/types';
+
+const jewelryList = ref<Jewelry[]>([]);
+const dialogVisible = ref(false);
+const detailVisible = ref(false);
+const editingItem = ref<Jewelry | null>(null);
+const currentDetail = ref<Jewelry | null>(null);
+const formRef = ref<FormInstance>();
+
+const formData = reactive({
+  name: '',
+  material: '',
+  color: '',
+  purchaseDate: '',
+  storageLocation: '',
+  suitableScenarios: [] as string[],
+});
+
+const loadList = async () => {
+  jewelryList.value = await jewelryApi.list();
+};
+
+const openDialog = (item?: Jewelry) => {
+  editingItem.value = item || null;
+  if (item) {
+    Object.assign(formData, {
+      name: item.name,
+      material: item.material,
+      color: item.color,
+      purchaseDate: item.purchaseDate?.split('T')[0] || '',
+      storageLocation: item.storageLocation,
+      suitableScenarios: item.suitableScenarios
+        ? item.suitableScenarios.split(/[、,，]/).map((s: string) => s.trim()).filter((s: string) => s.length > 0)
+        : [],
+    });
+  } else {
+    Object.assign(formData, {
+      name: '',
+      material: '',
+      color: '',
+      purchaseDate: '',
+      storageLocation: '',
+      suitableScenarios: [],
+    });
+  }
+  dialogVisible.value = true;
+};
+
+const handleSubmit = async () => {
+  await formRef.value?.validate();
+  const data: any = {
+    name: formData.name,
+    material: formData.material,
+    color: formData.color,
+    purchaseDate: formData.purchaseDate,
+    storageLocation: formData.storageLocation,
+    suitableScenarios: Array.isArray(formData.suitableScenarios)
+      ? formData.suitableScenarios.join('、')
+      : formData.suitableScenarios,
+  };
+  if (editingItem.value) {
+    await jewelryApi.update(editingItem.value.id, data);
+    ElMessage.success('更新成功');
+  } else {
+    await jewelryApi.create(data);
+    ElMessage.success('创建成功');
+  }
+  dialogVisible.value = false;
+  loadList();
+};
+
+const handleDelete = async (item: Jewelry) => {
+  try {
+    await ElMessageBox.confirm(`确定删除「${item.name}」吗？`, '提示', { type: 'warning' });
+    await jewelryApi.delete(item.id);
+    ElMessage.success('删除成功');
+    loadList();
+  } catch {}
+};
+
+const showDetail = async (item: Jewelry) => {
+  currentDetail.value = await jewelryApi.detail(item.id);
+  detailVisible.value = true;
+};
+
+const formatDate = (d: string) => d?.split('T')[0] || '';
+
+onMounted(loadList);
+</script>
+
+<style scoped>
+.jewelry-card {
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  position: relative;
+}
+.jewelry-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(168, 85, 247, 0.15);
+}
+.jewelry-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #e9d5ff, #c084fc);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+.jewelry-name {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #4c1d95;
+}
+.jewelry-meta {
+  margin-bottom: 12px;
+}
+.jewelry-info {
+  font-size: 13px;
+  color: #6b4c8a;
+  margin: 4px 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.jewelry-stats {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #8b5cf6;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #f3e8ff;
+}
+.jewelry-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+</style>

@@ -1,0 +1,14 @@
+import { Module } from '@nestjs/common';
+import { JewelryModule } from './jewelry/jewelry.module';
+import { OutfitModule } from './outfit/outfit.module';
+import { MaintenanceModule } from './maintenance/maintenance.module';
+import { RepairModule } from './repair/repair.module';
+import { StatsModule } from './stats/stats.module';
+import { PrismaService } from './common/prisma.service';
+
+@Module({
+  imports: [JewelryModule, OutfitModule, MaintenanceModule, RepairModule, StatsModule],
+  providers: [PrismaService],
+  exports: [PrismaService],
+})
+export class AppModule {}

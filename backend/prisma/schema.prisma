@@ -1,0 +1,61 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Jewelry {
+  id            Int       @id @default(autoincrement())
+  name          String
+  material      String
+  color         String
+  purchaseDate  DateTime
+  storageLocation String
+  suitableScenarios String
+  imageUrl      String?
+  createdAt     DateTime  @default(now())
+  outfits       Outfit[]
+  maintenances  Maintenance[]
+  repairs       Repair[]
+}
+
+model Outfit {
+  id           Int      @id @default(autoincrement())
+  jewelryId    Int
+  wearDate     DateTime
+  outfitTags   String
+  isAllergic   Boolean  @default(false)
+  isFading     Boolean  @default(false)
+  cleanStatus  String
+  notes        String?
+  createdAt    DateTime @default(now())
+  jewelry      Jewelry  @relation(fields: [jewelryId], references: [id], onDelete: Cascade)
+}
+
+model Maintenance {
+  id           Int      @id @default(autoincrement())
+  jewelryId    Int
+  date         DateTime
+  type         String
+  description  String
+  result       String?
+  createdAt    DateTime @default(now())
+  jewelry      Jewelry  @relation(fields: [jewelryId], references: [id], onDelete: Cascade)
+}
+
+model Repair {
+  id            Int      @id @default(autoincrement())
+  jewelryId     Int
+  problemType   String
+  sendDate      DateTime
+  repairItems   String
+  cost          Float
+  returnDate    DateTime?
+  status        String
+  notes         String?
+  createdAt     DateTime @default(now())
+  jewelry       Jewelry  @relation(fields: [jewelryId], references: [id], onDelete: Cascade)
+}
