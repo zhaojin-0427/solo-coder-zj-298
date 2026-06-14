@@ -22,6 +22,13 @@ export class CreateJewelryDto {
   @IsOptional()
   @IsString()
   imageUrl?: string;
+
+  @IsOptional()
+  purchasePrice?: number;
+
+  @IsOptional()
+  @IsString()
+  invoiceNumber?: string;
 }
 
 export class UpdateJewelryDto {
@@ -52,4 +59,11 @@ export class UpdateJewelryDto {
   @IsOptional()
   @IsString()
   imageUrl?: string;
+
+  @IsOptional()
+  purchasePrice?: number;
+
+  @IsOptional()
+  @IsString()
+  invoiceNumber?: string;
 }

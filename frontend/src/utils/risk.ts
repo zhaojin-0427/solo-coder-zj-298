@@ -1,4 +1,4 @@
-import type { RiskLevel, RiskAssessment, Jewelry, Outfit, Repair } from '../types';
+import type { RiskLevel, RiskAssessment, Jewelry, Outfit, Repair, Valuation, Insurance, Credential, AssetStatusTag } from '../types';
 
 export const getRiskLevelInfo = (level: RiskLevel) => {
   const map: Record<RiskLevel, { text: string; color: string; type: any; icon: string }> = {
@@ -177,4 +177,147 @@ export const calculateRiskLocally = (
     factors,
     reminders,
   };
+};
+
+export const generateAssetStatusTags = (
+  jewelry: Jewelry & {
+    valuations?: Valuation[];
+    insurances?: Insurance[];
+    credentials?: Credential[];
+    lendings?: any[];
+    repairs?: Repair[];
+    outfits?: Outfit[];
+  },
+): AssetStatusTag[] => {
+  const tags: AssetStatusTag[] = [];
+  const now = new Date();
+
+  const risk = calculateRiskLocally(jewelry);
+  if (risk.level === 'critical') {
+    tags.push({ label: '极高风险', type: 'danger' });
+  } else if (risk.level === 'high') {
+    tags.push({ label: '高风险', type: 'warning' });
+  } else if (risk.level === 'medium') {
+    tags.push({ label: '中风险', type: 'info' });
+  }
+
+  const activeRepairs = (jewelry.repairs || []).filter(
+    (r) => r.status === '维修中' || r.status === '待取件',
+  );
+  if (activeRepairs.length > 0) {
+    tags.push({ label: '维修中', type: 'warning' });
+  }
+
+  if (jewelry.lendings && jewelry.lendings.length > 0) {
+    const lending = jewelry.lendings[0];
+    if (lending.status === '逾期未还') {
+      tags.push({ label: '逾期未还', type: 'danger' });
+    } else {
+      tags.push({ label: '已借出', type: 'warning' });
+    }
+  }
+
+  const outfits = jewelry.outfits || [];
+  let idleDays = 0;
+  if (outfits.length === 0) {
+    idleDays = Math.floor(
+      (now.getTime() - new Date(jewelry.purchaseDate).getTime()) / (1000 * 60 * 60 * 24),
+    );
+  } else {
+    const lastWear = outfits[0]?.wearDate;
+    if (lastWear) {
+      idleDays = Math.floor(
+        (now.getTime() - new Date(lastWear).getTime()) / (1000 * 60 * 60 * 24),
+      );
+    }
+  }
+  if (idleDays >= 90) {
+    tags.push({ label: '长期闲置', type: 'warning' });
+  } else if (idleDays >= 60) {
+    tags.push({ label: '闲置中', type: 'info' });
+  }
+
+  const valuations = jewelry.valuations || [];
+  if (valuations.length > 0) {
+    const lastValDate = new Date(valuations[0].valuationDate);
+    const daysSinceValuation = Math.floor(
+      (now.getTime() - lastValDate.getTime()) / (1000 * 60 * 60 * 24),
+    );
+    if (daysSinceValuation > 365) {
+      tags.push({ label: '估值过期', type: 'danger' });
+    } else if (daysSinceValuation > 270) {
+      tags.push({ label: '估值将过期', type: 'warning' });
+    }
+  } else {
+    tags.push({ label: '未估值', type: 'info' });
+  }
+
+  const insurances = (jewelry.insurances || []).filter((i) => i.status === '生效中');
+  if (insurances.length === 0) {
+    const val = valuations[0]?.currentValue || jewelry.purchasePrice || 0;
+    if (val >= 5000) {
+      tags.push({ label: '未投保', type: 'danger' });
+    }
+  } else {
+    const ins = insurances[0];
+    const daysToExpiry = Math.floor(
+      (new Date(ins.endDate).getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+    );
+    if (daysToExpiry < 0) {
+      tags.push({ label: '保险过期', type: 'danger' });
+    } else if (daysToExpiry <= 30) {
+      tags.push({ label: '保险将到期', type: 'warning' });
+    }
+  }
+
+  const requiredTypes = ['购买凭证', '鉴定证书'];
+  const existingTypes = new Set((jewelry.credentials || []).map((c) => c.type));
+  const missingTypes = requiredTypes.filter((t) => !existingTypes.has(t));
+  if (missingTypes.length > 0) {
+    tags.push({ label: '凭证缺失', type: 'warning' });
+  }
+
+  return tags;
+};
+
+export const getInsuranceRiskWarning = (
+  jewelry: Jewelry & {
+    valuations?: Valuation[];
+    insurances?: Insurance[];
+  },
+): { hasRisk: boolean; warnings: string[] } => {
+  const warnings: string[] = [];
+  const valuations = jewelry.valuations || [];
+  const insurances = (jewelry.insurances || []).filter((i) => i.status === '生效中');
+  const val = valuations[0]?.currentValue || jewelry.purchasePrice || 0;
+  const now = new Date();
+
+  if (insurances.length === 0) {
+    if (val >= 5000) {
+      warnings.push(`该首饰估值 ¥${val.toLocaleString()}，尚未投保，存在资产风险`);
+    } else if (val > 0) {
+      warnings.push('该首饰未投保');
+    }
+  } else {
+    const ins = insurances[0];
+    const daysToExpiry = Math.floor(
+      (new Date(ins.endDate).getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+    );
+    if (daysToExpiry < 0) {
+      warnings.push(`该首饰保单已过期（${new Date(ins.endDate).toISOString().split('T')[0]}），需尽快续保`);
+    } else if (daysToExpiry <= 30) {
+      warnings.push(`该首饰保单将于 ${daysToExpiry} 天后到期，请注意续保`);
+    }
+  }
+
+  if (valuations.length > 0) {
+    const daysSinceValuation = Math.floor(
+      (now.getTime() - new Date(valuations[0].valuationDate).getTime()) / (1000 * 60 * 60 * 24),
+    );
+    if (daysSinceValuation > 365) {
+      warnings.push('该首饰估值已超过1年未更新，建议重新估值');
+    }
+  }
+
+  return { hasRisk: warnings.length > 0, warnings };
 };

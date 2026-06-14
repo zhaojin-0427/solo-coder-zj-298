@@ -88,6 +88,10 @@
             <el-icon color="#ef4444"><Warning /></el-icon>
             <span>归还时有损耗，补偿 ¥{{ item.compensationAmount.toFixed(2) }}</span>
           </div>
+          <div v-if="getJewelryInsuranceRisk(item.jewelryId).hasRisk" class="lending-insurance-warning">
+            <el-icon color="#f59e0b"><Warning /></el-icon>
+            <span>{{ getJewelryInsuranceRisk(item.jewelryId).warnings[0] }}</span>
+          </div>
           <div class="lending-actions">
             <el-button
               v-if="item.status === '借出中' || item.status === '逾期未还'"
@@ -182,6 +186,17 @@
           />
         </el-form-item>
       </el-form>
+      <el-alert
+        v-if="lendInsuranceRisk.hasRisk"
+        type="warning"
+        :closable="false"
+        style="margin-top: 12px"
+      >
+        <template #title>保险/估值风险提醒</template>
+        <ul style="margin: 4px 0 0; padding-left: 18px">
+          <li v-for="w in lendInsuranceRisk.warnings" :key="w">{{ w }}</li>
+        </ul>
+      </el-alert>
       <template #footer>
         <el-button @click="lendDialogVisible = false">取消</el-button>
         <el-button type="primary" @click="handleLendSubmit">确认借出</el-button>
@@ -292,6 +307,7 @@ import { ElMessage, ElMessageBox, type FormInstance } from 'element-plus';
 import { Plus, Delete, Present, User, Warning } from '@element-plus/icons-vue';
 import { lendingApi, jewelryApi } from '@/api';
 import type { Lending, Jewelry } from '@/types';
+import { getInsuranceRiskWarning } from '@/utils/risk';
 
 const lendingList = ref<Lending[]>([]);
 const jewelryList = ref<Jewelry[]>([]);
@@ -330,6 +346,19 @@ const returnForm = reactive({
 
 const availableJewelry = computed(() => {
   return jewelryList.value.filter((j) => !j.lendings || j.lendings.length === 0);
+});
+
+const getJewelryInsuranceRisk = (jewelryId: number) => {
+  const jewelry = jewelryList.value.find((j) => j.id === jewelryId);
+  if (!jewelry) return { hasRisk: false, warnings: [] };
+  return getInsuranceRiskWarning(jewelry);
+};
+
+const lendInsuranceRisk = computed(() => {
+  if (!lendForm.jewelryId) return { hasRisk: false, warnings: [] };
+  const jewelry = jewelryList.value.find((j) => j.id === lendForm.jewelryId);
+  if (!jewelry) return { hasRisk: false, warnings: [] };
+  return getInsuranceRiskWarning(jewelry);
 });
 
 const loadList = async () => {
@@ -545,6 +574,18 @@ onMounted(() => {
   border-radius: 6px;
   font-size: 13px;
   color: #dc2626;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lending-insurance-warning {
+  padding: 8px 16px;
+  background: #fffbeb;
+  margin: 0 16px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #d97706;
   display: flex;
   align-items: center;
   gap: 6px;

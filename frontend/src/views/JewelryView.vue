@@ -55,6 +55,20 @@
             <span>{{ item._count?.maintenances || 0 }}次养护</span>
             <span>{{ item._count?.repairs || 0 }}次维修</span>
           </div>
+          <div v-if="item.valuations && item.valuations.length > 0" class="jewelry-valuation">
+            <span class="valuation-label">估值</span>
+            <span class="valuation-value">¥{{ item.valuations[0].currentValue.toLocaleString() }}</span>
+          </div>
+          <div class="jewelry-asset-tags">
+            <el-tag
+              v-for="tag in generateAssetStatusTags(item).slice(0, 3)"
+              :key="tag.label"
+              :type="tag.type"
+              effect="dark"
+              size="small"
+              style="margin: 2px"
+            >{{ tag.label }}</el-tag>
+          </div>
           <div class="jewelry-actions">
             <el-button size="small" @click.stop="openDialog(item)">编辑</el-button>
             <el-button
@@ -189,6 +203,64 @@
           </div>
         </div>
 
+        <div class="asset-section">
+          <h3 class="form-section-title">
+            <el-icon color="#6b21a8"><Wallet /></el-icon> 资产与保险
+          </h3>
+          <el-descriptions :column="2" border size="small">
+            <el-descriptions-item label="原始购入价">
+              <span v-if="currentDetail.purchasePrice">¥{{ currentDetail.purchasePrice.toLocaleString() }}</span>
+              <span v-else class="muted">未录入</span>
+            </el-descriptions-item>
+            <el-descriptions-item label="发票编号">
+              {{ currentDetail.invoiceNumber || '未录入' }}
+            </el-descriptions-item>
+            <el-descriptions-item label="当前估值">
+              <template v-if="currentDetail.valuations && currentDetail.valuations.length > 0">
+                <span class="valuation-value">¥{{ currentDetail.valuations[0].currentValue.toLocaleString() }}</span>
+              </template>
+              <span v-else class="muted">未估值</span>
+            </el-descriptions-item>
+            <el-descriptions-item label="估值日期">
+              <template v-if="currentDetail.valuations && currentDetail.valuations.length > 0">
+                {{ formatDate(currentDetail.valuations[0].valuationDate) }}
+              </template>
+              <span v-else class="muted">—</span>
+            </el-descriptions-item>
+            <el-descriptions-item label="保险状态">
+              <template v-if="currentDetail.insurances && currentDetail.insurances.length > 0">
+                <el-tag :type="currentDetail.insurances[0].status === '生效中' ? 'success' : 'info'" effect="dark" size="small">
+                  {{ currentDetail.insurances[0].status }}
+                </el-tag>
+                <span style="margin-left: 8px; font-size: 12px; color: #6b4c8a">
+                  {{ currentDetail.insurances[0].insuranceCompany }} · 止期 {{ formatDate(currentDetail.insurances[0].endDate) }}
+                </span>
+              </template>
+              <el-tag v-else type="danger" effect="light" size="small">未投保</el-tag>
+            </el-descriptions-item>
+            <el-descriptions-item label="凭证完整度">
+              <template v-if="currentDetail.credentials">
+                <el-progress
+                  :percentage="getCredentialCompleteness(currentDetail.credentials)"
+                  :stroke-width="14"
+                  :color="getCredentialCompleteness(currentDetail.credentials) >= 80 ? '#10b981' : getCredentialCompleteness(currentDetail.credentials) >= 50 ? '#f59e0b' : '#ef4444'"
+                  style="width: 100%"
+                />
+              </template>
+            </el-descriptions-item>
+          </el-descriptions>
+          <div class="asset-status-tags" style="margin-top: 8px">
+            <el-tag
+              v-for="tag in generateAssetStatusTags(currentDetail)"
+              :key="tag.label"
+              :type="tag.type"
+              effect="dark"
+              size="small"
+              style="margin: 2px"
+            >{{ tag.label }}</el-tag>
+          </div>
+        </div>
+
         <h3 style="margin-top: 24px" class="form-section-title">最近佩戴记录</h3>
         <el-table :data="currentDetail.outfits || []" size="small" empty-text="暂无佩戴记录">
           <el-table-column label="佩戴日期" prop="wearDate">
@@ -272,10 +344,10 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue';
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
-import { Plus, Delete, Present, Location, Calendar, Warning, Bell, CircleCheck, User } from '@element-plus/icons-vue';
+import { Plus, Delete, Present, Location, Calendar, Warning, Bell, CircleCheck, User, Wallet } from '@element-plus/icons-vue';
 import { jewelryApi } from '@/api';
 import type { Jewelry, RiskAssessment, FutureJewelryPlan } from '@/types';
-import { calculateRiskLocally, getRiskLevelInfo, getRiskTagType } from '@/utils/risk';
+import { calculateRiskLocally, getRiskLevelInfo, getRiskTagType, generateAssetStatusTags } from '@/utils/risk';
 
 const jewelryList = ref<Jewelry[]>([]);
 const dialogVisible = ref(false);
@@ -392,6 +464,15 @@ const showDetail = async (item: Jewelry) => {
 
 const formatDate = (d: string) => d?.split('T')[0] || '';
 
+const getCredentialCompleteness = (credentials: any[]) => {
+  const requiredTypes = ['购买凭证', '鉴定证书'];
+  const existingTypes = new Set(credentials.map((c: any) => c.type));
+  const total = requiredTypes.length + existingTypes.size;
+  const matched = requiredTypes.filter((t) => existingTypes.has(t)).length;
+  const extra = [...existingTypes].filter((t) => !requiredTypes.includes(t)).length;
+  return Math.round(((matched + extra) / (requiredTypes.length + extra)) * 100) || 0;
+};
+
 onMounted(loadList);
 </script>
 
@@ -470,6 +551,42 @@ onMounted(loadList);
 .risk-tag {
   margin-top: 6px;
   font-weight: 600;
+}
+
+.jewelry-valuation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  margin-top: 8px;
+  padding: 4px 8px;
+  background: #f0fdf4;
+  border-radius: 4px;
+}
+
+.valuation-label {
+  color: #10b981;
+  font-weight: 600;
+}
+
+.valuation-value {
+  color: #065f46;
+  font-weight: 700;
+}
+
+.jewelry-asset-tags {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.muted {
+  color: #9ca3af;
+  font-size: 13px;
+}
+
+.asset-section {
+  margin-top: 24px;
 }
 
 .detail-header {

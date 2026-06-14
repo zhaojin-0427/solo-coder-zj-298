@@ -343,6 +343,114 @@
 
     <el-divider content-position="left">
       <span class="divider-title">
+        <el-icon :size="20" color="#10b981"><Wallet /></el-icon>
+        资产与保险统计
+      </span>
+    </el-divider>
+
+    <el-row :gutter="16" style="margin-bottom: 16px">
+      <el-col :xs="12" :sm="12" :md="6">
+        <div class="stat-card">
+          <el-icon :size="28" color="#6b21a8"><Wallet /></el-icon>
+          <div class="label">首饰总资产估值</div>
+          <div class="value">¥{{ (assetStats.totalValuation || 0).toLocaleString() }}</div>
+        </div>
+      </el-col>
+      <el-col :xs="12" :sm="12" :md="6">
+        <div class="stat-card">
+          <el-icon :size="28" color="#10b981"><CircleCheck /></el-icon>
+          <div class="label">保险覆盖率</div>
+          <div class="value">{{ assetStats.insuranceCoverageRate || 0 }}%</div>
+        </div>
+      </el-col>
+      <el-col :xs="12" :sm="12" :md="6">
+        <div class="stat-card">
+          <el-icon :size="28" color="#f59e0b"><Warning /></el-icon>
+          <div class="label">凭证缺失率</div>
+          <div class="value">{{ assetStats.credentialMissingRate || 0 }}%</div>
+        </div>
+      </el-col>
+      <el-col :xs="12" :sm="12" :md="6">
+        <div class="stat-card">
+          <el-icon :size="28" color="#3b82f6"><Present /></el-icon>
+          <div class="label">已投保件数</div>
+          <div class="value">{{ assetStats.insuredCount || 0 }}/{{ assetStats.totalJewelry || 0 }}</div>
+        </div>
+      </el-col>
+    </el-row>
+
+    <el-row :gutter="16">
+      <el-col :xs="24" :md="12" style="margin-bottom: 16px">
+        <el-card class="card chart-card" shadow="never">
+          <div class="card-header">
+            <h3><el-icon color="#6b21a8"><PieChart /></el-icon> 材质维度资产分布</h3>
+          </div>
+          <div ref="materialAssetChartRef" class="chart-box"></div>
+        </el-card>
+      </el-col>
+      <el-col :xs="24" :md="12" style="margin-bottom: 16px">
+        <el-card class="card chart-card" shadow="never">
+          <div class="card-header">
+            <h3><el-icon color="#10b981"><TrendCharts /></el-icon> 近12个月估值变化趋势</h3>
+          </div>
+          <div ref="valuationTrendChartRef" class="chart-box"></div>
+        </el-card>
+      </el-col>
+
+      <el-col :xs="24" :md="12" style="margin-bottom: 16px">
+        <el-card class="card" shadow="never">
+          <div class="card-header">
+            <h3><el-icon color="#f59e0b"><Warning /></el-icon> 保单到期提醒（30天内）</h3>
+            <el-tag v-if="assetStats.expiringPolicies && assetStats.expiringPolicies.length > 0" type="warning" effect="dark" size="small">
+              {{ assetStats.expiringPolicies.length }} 件即将到期
+            </el-tag>
+          </div>
+          <div v-if="assetStats.expiringPolicies && assetStats.expiringPolicies.length > 0">
+            <div v-for="p in assetStats.expiringPolicies" :key="p.id" class="idle-item">
+              <div class="idle-icon" style="background: linear-gradient(135deg, #fef3c7, #fde68a)">
+                <el-icon :size="20" color="#f59e0b"><Warning /></el-icon>
+              </div>
+              <div class="idle-info">
+                <div class="idle-name">
+                  {{ p.name }}
+                  <el-tag type="warning" effect="dark" size="small">剩余 {{ p.daysRemaining }} 天</el-tag>
+                </div>
+                <div class="idle-meta">{{ p.insuranceCompany }} · {{ p.policyNumber }} · 到期 {{ p.endDate?.split('T')[0] }}</div>
+              </div>
+            </div>
+          </div>
+          <el-empty v-else description="暂无即将到期保单" :image-size="80" />
+        </el-card>
+      </el-col>
+
+      <el-col :xs="24" :md="12" style="margin-bottom: 16px">
+        <el-card class="card" shadow="never">
+          <div class="card-header">
+            <h3><el-icon color="#ef4444"><Rank /></el-icon> 高价值高风险首饰排行</h3>
+          </div>
+          <div v-if="assetStats.highValueHighRisk && assetStats.highValueHighRisk.length > 0">
+            <div v-for="(item, idx) in assetStats.highValueHighRisk" :key="item.id" class="ranking-item">
+              <div class="ranking-rank" :class="'rank-' + (idx + 1)">{{ idx + 1 }}</div>
+              <div class="ranking-info">
+                <div class="ranking-name">
+                  {{ item.name }}
+                  <el-tag size="small" effect="plain">{{ item.material }}</el-tag>
+                  <el-tag v-if="!item.isInsured" type="danger" effect="dark" size="small" style="margin-left: 4px">未投保</el-tag>
+                </div>
+                <div class="ranking-factor">
+                  ¥{{ item.currentValue.toLocaleString() }}
+                  <span style="color: #ef4444; margin-left: 8px">{{ item.riskFactors.join('、') }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <el-empty v-else description="暂无高风险高价值首饰" :image-size="80" />
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <el-divider content-position="left">
+      <span class="divider-title">
         <el-icon :size="20" color="#10b981"><Calendar /></el-icon>
         智能排程统计
       </span>
@@ -539,9 +647,10 @@ import {
   Calendar,
   Date as DateIcon,
   CircleCheck,
+  Wallet,
 } from '@element-plus/icons-vue';
-import { statsApi, jewelryApi } from '@/api';
-import type { AllStats, RiskStats, LendingStats, ScheduleStats } from '@/types';
+import { statsApi, jewelryApi, assetApi } from '@/api';
+import type { AllStats, RiskStats, LendingStats, ScheduleStats, AssetStats } from '@/types';
 import { getRiskLevelInfo, getRiskTagType, getReminderTypeInfo } from '@/utils/risk';
 
 const idleDays = ref(30);
@@ -549,6 +658,7 @@ const data = reactive<Partial<AllStats>>({});
 const riskStats = ref<Partial<RiskStats>>({});
 const lendingStats = reactive<Partial<LendingStats>>({});
 const scheduleStats = reactive<Partial<ScheduleStats>>({});
+const assetStats = reactive<Partial<AssetStats>>({});
 
 const todayStr = computed(() => new Date().toISOString().split('T')[0]);
 const totalPlannedInCalendar = computed(() => {
@@ -573,6 +683,8 @@ const riskMaterialChartRef = ref<HTMLElement>();
 const wearChartRef = ref<HTMLElement>();
 const unavailableChartRef = ref<HTMLElement>();
 const hitTrendChartRef = ref<HTMLElement>();
+const materialAssetChartRef = ref<HTMLElement>();
+const valuationTrendChartRef = ref<HTMLElement>();
 
 let materialChart: echarts.ECharts | null = null;
 let problemChart: echarts.ECharts | null = null;
@@ -581,6 +693,8 @@ let riskMaterialChart: echarts.ECharts | null = null;
 let wearChart: echarts.ECharts | null = null;
 let unavailableChart: echarts.ECharts | null = null;
 let hitTrendChart: echarts.ECharts | null = null;
+let materialAssetChart: echarts.ECharts | null = null;
+let valuationTrendChart: echarts.ECharts | null = null;
 
 const purplePalette = ['#a855f7', '#c084fc', '#e879f9', '#8b5cf6', '#7c3aed', '#6d28d9', '#5b21b6', '#4c1d95'];
 
@@ -601,11 +715,16 @@ const loadData = async () => {
   if (schedule) {
     Object.assign(scheduleStats, schedule);
   }
+  const asset = await assetApi.getStats().catch(() => null);
+  if (asset) {
+    Object.assign(assetStats, asset);
+  }
   await nextTick();
   renderCharts();
   renderRiskCharts();
   renderLendingCharts();
   renderScheduleCharts();
+  renderAssetCharts();
 };
 
 const renderCharts = () => {
@@ -847,6 +966,135 @@ const renderLendingCharts = () => {
   renderWearChart();
 };
 
+const renderAssetCharts = () => {
+  renderMaterialAssetChart();
+  renderValuationTrendChart();
+};
+
+const renderMaterialAssetChart = () => {
+  if (!materialAssetChartRef.value) return;
+  if (!materialAssetChart) {
+    materialAssetChart = echarts.init(materialAssetChartRef.value);
+  }
+  const items = assetStats.materialAssetDistribution || [];
+  materialAssetChart.setOption({
+    tooltip: {
+      trigger: 'item',
+      formatter: '{b}: ¥{c} ({d}%)',
+    },
+    legend: {
+      bottom: 0,
+      left: 'center',
+      icon: 'circle',
+      textStyle: { color: '#6b4c8a' },
+    },
+    color: purplePalette,
+    series: [
+      {
+        name: '资产分布',
+        type: 'pie',
+        radius: ['40%', '68%'],
+        center: ['50%', '42%'],
+        avoidLabelOverlap: false,
+        itemStyle: {
+          borderRadius: 8,
+          borderColor: '#fff',
+          borderWidth: 2,
+        },
+        label: {
+          show: true,
+          formatter: '{b}\n¥{c}',
+          color: '#4c1d95',
+          fontSize: 12,
+        },
+        emphasis: {
+          label: {
+            show: true,
+            fontSize: 14,
+            fontWeight: 'bold',
+          },
+          itemStyle: {
+            shadowBlur: 10,
+            shadowOffsetX: 0,
+            shadowColor: 'rgba(168, 85, 247, 0.3)',
+          },
+        },
+        data: items.length > 0
+          ? items.map((i) => ({ name: i.material, value: i.totalValue }))
+          : [{ name: '暂无数据', value: 1, itemStyle: { color: '#e5e7eb' }, label: { show: false } }],
+      },
+    ],
+  });
+};
+
+const renderValuationTrendChart = () => {
+  if (!valuationTrendChartRef.value) return;
+  if (!valuationTrendChart) {
+    valuationTrendChart = echarts.init(valuationTrendChartRef.value);
+  }
+  const items = assetStats.valuationTrend || [];
+  valuationTrendChart.setOption({
+    tooltip: {
+      trigger: 'axis',
+      formatter: (params: any) => {
+        const p = params[0];
+        const item = items[p.dataIndex];
+        return `${item?.period || p.axisValue}<br/>总估值: ¥${p.value?.toLocaleString()}<br/>首饰数: ${item?.jewelryCount || 0}`;
+      },
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: '3%',
+      top: '10%',
+      containLabel: true,
+    },
+    xAxis: {
+      type: 'category',
+      data: items.length > 0 ? items.map((i) => i.period.slice(5)) : ['暂无数据'],
+      axisLabel: { color: '#6b4c8a' },
+      axisLine: { lineStyle: { color: '#e9d5ff' } },
+    },
+    yAxis: {
+      type: 'value',
+      name: '总估值(¥)',
+      axisLabel: { color: '#6b4c8a' },
+      splitLine: { lineStyle: { color: '#f3e8ff', type: 'dashed' } },
+    },
+    series: [
+      {
+        name: '总估值',
+        type: 'line',
+        smooth: true,
+        symbol: 'circle',
+        symbolSize: 8,
+        itemStyle: { color: '#10b981' },
+        lineStyle: {
+          width: 3,
+          color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+            { offset: 0, color: '#10b981' },
+            { offset: 1, color: '#3b82f6' },
+          ]),
+        },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(16, 185, 129, 0.3)' },
+            { offset: 1, color: 'rgba(16, 185, 129, 0.02)' },
+          ]),
+        },
+        label: {
+          show: true,
+          position: 'top',
+          color: '#065f46',
+          fontWeight: 'bold',
+          formatter: (params: any) => '¥' + params.value?.toLocaleString(),
+        },
+        data: items.length > 0 ? items.map((i) => i.totalValue) : [0],
+      },
+    ],
+  });
+};
+
 const renderScheduleCharts = () => {
   renderUnavailableChart();
   renderHitTrendChart();
@@ -1033,6 +1281,8 @@ const handleResize = () => {
   wearChart?.resize();
   unavailableChart?.resize();
   hitTrendChart?.resize();
+  materialAssetChart?.resize();
+  valuationTrendChart?.resize();
 };
 
 onMounted(async () => {
@@ -1049,6 +1299,8 @@ onBeforeUnmount(() => {
   wearChart?.dispose();
   unavailableChart?.dispose();
   hitTrendChart?.dispose();
+  materialAssetChart?.dispose();
+  valuationTrendChart?.dispose();
 });
 </script>
 

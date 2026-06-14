@@ -6,10 +6,11 @@ import { RepairModule } from './repair/repair.module';
 import { StatsModule } from './stats/stats.module';
 import { LendingModule } from './lending/lending.module';
 import { ScheduleModule } from './schedule/schedule.module';
+import { AssetModule } from './asset/asset.module';
 import { PrismaService } from './common/prisma.service';
 
 @Module({
-  imports: [JewelryModule, OutfitModule, MaintenanceModule, RepairModule, StatsModule, LendingModule, ScheduleModule],
+  imports: [JewelryModule, OutfitModule, MaintenanceModule, RepairModule, StatsModule, LendingModule, ScheduleModule, AssetModule],
   providers: [PrismaService],
   exports: [PrismaService],
 })

@@ -33,6 +33,10 @@
           <el-icon><Van /></el-icon>
           <span>借还管理</span>
         </el-menu-item>
+        <el-menu-item index="/asset">
+          <el-icon><Wallet /></el-icon>
+          <span>资产与保险</span>
+        </el-menu-item>
         <el-menu-item index="/schedule">
           <el-icon><Calendar /></el-icon>
           <span>智能排程</span>
@@ -69,6 +73,7 @@ import {
   DataAnalysis,
   Van,
   Calendar,
+  Wallet,
 } from '@element-plus/icons-vue';
 
 const route = useRoute();

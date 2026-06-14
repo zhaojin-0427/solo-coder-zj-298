@@ -33,6 +33,30 @@ export class JewelryService {
             status: true,
           },
         },
+        valuations: {
+          orderBy: { valuationDate: 'desc' },
+          take: 1,
+          select: {
+            id: true,
+            currentValue: true,
+            valuationDate: true,
+            valuationAgency: true,
+          },
+        },
+        insurances: {
+          where: { status: '生效中' },
+          take: 1,
+          select: {
+            id: true,
+            policyNumber: true,
+            insuranceCompany: true,
+            endDate: true,
+            status: true,
+          },
+        },
+        credentials: {
+          select: { id: true, type: true },
+        },
       },
     });
   }
@@ -69,6 +93,17 @@ export class JewelryService {
             },
           },
           orderBy: { wearPlan: { planDate: 'asc' } },
+        },
+        valuations: {
+          orderBy: { valuationDate: 'desc' },
+          take: 5,
+        },
+        insurances: {
+          orderBy: { createdAt: 'desc' },
+          take: 3,
+        },
+        credentials: {
+          orderBy: { createdAt: 'desc' },
         },
       },
     });

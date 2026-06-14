@@ -33,6 +33,12 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '借还管理', icon: 'Van' },
   },
   {
+    path: '/asset',
+    name: 'AssetInsurance',
+    component: () => import('@/views/AssetInsuranceView.vue'),
+    meta: { title: '资产与保险', icon: 'Wallet' },
+  },
+  {
     path: '/schedule',
     name: 'Schedule',
     component: () => import('@/views/ScheduleView.vue'),

@@ -15,6 +15,15 @@ import type {
   ScheduleConflict,
   ScheduleStats,
   FutureJewelryPlan,
+  Valuation,
+  Insurance,
+  Credential,
+  AssetStats,
+  UninsuredJewelry,
+  ExpiredValuationJewelry,
+  MissingCredentialJewelry,
+  HighValueJewelry,
+  JewelryAssetInfo,
 } from '../types';
 
 const api = axios.create({
@@ -112,4 +121,41 @@ export const scheduleApi = {
       .then((r) => r.data),
 
   deletePlan: (id: number) => api.delete(`/schedule/${id}`).then((r) => r.data),
+};
+
+export const assetApi = {
+  getValuations: (jewelryId?: number) =>
+    api.get<Valuation[]>('/asset/valuations', { params: { jewelryId } }).then((r) => r.data),
+  createValuation: (data: Partial<Valuation> & { jewelryId: number; currentValue: number; valuationDate: string; valuationAgency: string }) =>
+    api.post<Valuation>('/asset/valuations', data).then((r) => r.data),
+  deleteValuation: (id: number) => api.delete(`/asset/valuations/${id}`).then((r) => r.data),
+
+  getInsurances: (jewelryId?: number) =>
+    api.get<Insurance[]>('/asset/insurances', { params: { jewelryId } }).then((r) => r.data),
+  createInsurance: (data: Partial<Insurance> & { jewelryId: number; policyNumber: string; insuranceCompany: string; startDate: string; endDate: string; insuredAmount: number; claimsContact: string }) =>
+    api.post<Insurance>('/asset/insurances', data).then((r) => r.data),
+  updateInsurance: (id: number, data: Partial<Insurance>) =>
+    api.put<Insurance>(`/asset/insurances/${id}`, data).then((r) => r.data),
+  renewInsurance: (id: number, data: { policyNumber: string; insuranceCompany: string; startDate: string; endDate: string; insuredAmount: number; deductible?: number; claimsContact?: string; notes?: string }) =>
+    api.post<Insurance>(`/asset/insurances/${id}/renew`, data).then((r) => r.data),
+  deleteInsurance: (id: number) => api.delete(`/asset/insurances/${id}`).then((r) => r.data),
+
+  getCredentials: (jewelryId?: number) =>
+    api.get<Credential[]>('/asset/credentials', { params: { jewelryId } }).then((r) => r.data),
+  createCredential: (data: Partial<Credential> & { jewelryId: number; type: string }) =>
+    api.post<Credential>('/asset/credentials', data).then((r) => r.data),
+  updateCredential: (id: number, data: Partial<Credential>) =>
+    api.put<Credential>(`/asset/credentials/${id}`, data).then((r) => r.data),
+  deleteCredential: (id: number) => api.delete(`/asset/credentials/${id}`).then((r) => r.data),
+
+  getUninsured: () => api.get<UninsuredJewelry[]>('/asset/uninsured').then((r) => r.data),
+  getExpiringPolicies: (days?: number) =>
+    api.get<Insurance[]>('/asset/expiring-policies', { params: { days } }).then((r) => r.data),
+  getExpiredValuations: (days?: number) =>
+    api.get<ExpiredValuationJewelry[]>('/asset/expired-valuations', { params: { days } }).then((r) => r.data),
+  getMissingCredentials: () => api.get<MissingCredentialJewelry[]>('/asset/missing-credentials').then((r) => r.data),
+  getHighValue: (threshold?: number) =>
+    api.get<HighValueJewelry[]>('/asset/high-value', { params: { threshold } }).then((r) => r.data),
+  getStats: () => api.get<AssetStats>('/asset/stats').then((r) => r.data),
+  getJewelryAssetInfo: (id: number) => api.get<JewelryAssetInfo>(`/asset/jewelry/${id}`).then((r) => r.data),
 };

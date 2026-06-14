@@ -7,11 +7,16 @@ export interface Jewelry {
   storageLocation: string;
   suitableScenarios: string;
   imageUrl?: string;
+  purchasePrice?: number;
+  invoiceNumber?: string;
   createdAt: string;
   outfits?: Outfit[];
   maintenances?: Maintenance[];
   repairs?: Repair[];
   lendings?: Lending[];
+  valuations?: Valuation[];
+  insurances?: Insurance[];
+  credentials?: Credential[];
   _count?: {
     outfits: number;
     maintenances: number;
@@ -364,3 +369,152 @@ export interface ScheduleStats {
   conflicts: ScheduleConflict[];
   recommendationHitTrend: HitTrendItem[];
 }
+
+export interface Valuation {
+  id: number;
+  jewelryId: number;
+  currentValue: number;
+  valuationDate: string;
+  valuationAgency: string;
+  notes?: string;
+  createdAt: string;
+  jewelry?: {
+    id: number;
+    name: string;
+    material: string;
+  };
+}
+
+export interface Insurance {
+  id: number;
+  jewelryId: number;
+  policyNumber: string;
+  insuranceCompany: string;
+  startDate: string;
+  endDate: string;
+  insuredAmount: number;
+  deductible: number;
+  claimsContact: string;
+  status: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+  jewelry?: {
+    id: number;
+    name: string;
+    material: string;
+  };
+}
+
+export interface Credential {
+  id: number;
+  jewelryId: number;
+  type: string;
+  credentialNumber?: string;
+  description?: string;
+  fileUrl?: string;
+  issueDate?: string;
+  issuedBy?: string;
+  createdAt: string;
+  jewelry?: {
+    id: number;
+    name: string;
+    material: string;
+  };
+}
+
+export interface MaterialAssetDistribution {
+  material: string;
+  totalValue: number;
+  count: number;
+  percentage: number;
+}
+
+export interface ExpiringPolicy {
+  id: number;
+  name: string;
+  policyNumber: string;
+  insuranceCompany: string;
+  endDate: string;
+  daysRemaining: number;
+}
+
+export interface HighValueHighRiskItem {
+  id: number;
+  name: string;
+  material: string;
+  currentValue: number;
+  isInsured: boolean;
+  riskFactors: string[];
+}
+
+export interface ValuationTrendItem {
+  period: string;
+  totalValue: number;
+  jewelryCount: number;
+}
+
+export interface AssetStats {
+  totalValuation: number;
+  materialAssetDistribution: MaterialAssetDistribution[];
+  insuranceCoverageRate: number;
+  insuredCount: number;
+  totalJewelry: number;
+  expiringPolicies: ExpiringPolicy[];
+  credentialMissingRate: number;
+  missingCredentialCount: number;
+  highValueHighRisk: HighValueHighRiskItem[];
+  valuationTrend: ValuationTrendItem[];
+}
+
+export interface UninsuredJewelry {
+  id: number;
+  name: string;
+  material: string;
+  currentValuation: number | null;
+  purchasePrice: number | null;
+  credentialCount: number;
+}
+
+export interface ExpiredValuationJewelry {
+  id: number;
+  name: string;
+  material: string;
+  lastValuationDate: string | null;
+  lastValuationValue: number | null;
+}
+
+export interface MissingCredentialJewelry {
+  id: number;
+  name: string;
+  material: string;
+  missingTypes: string[];
+  existingCredentialTypes: string[];
+}
+
+export interface HighValueJewelry {
+  id: number;
+  name: string;
+  material: string;
+  currentValue: number;
+  isInsured: boolean;
+  lastValuationDate: string | null;
+}
+
+export interface JewelryAssetInfo {
+  jewelryId: number;
+  jewelryName: string;
+  purchasePrice: number | null;
+  invoiceNumber: string | null;
+  latestValuation: Valuation | null;
+  activeInsurance: Insurance | null;
+  credentials: Credential[];
+  valuationExpired: boolean;
+  credentialCompleteness: number;
+  insuranceStatus: string;
+}
+
+export type AssetStatusTag = {
+  label: string;
+  type: 'danger' | 'warning' | 'success' | 'info';
+};

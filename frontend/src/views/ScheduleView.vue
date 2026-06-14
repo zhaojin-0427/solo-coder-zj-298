@@ -220,6 +220,20 @@
             </div>
           </div>
 
+          <div v-if="getInsuranceRiskWarning(allJewelry.find(j => j.id === rec.jewelryId) as any).hasRisk" class="insurance-risk-warnings">
+            <div class="section-label">保险/估值风险：</div>
+            <el-alert
+              v-for="(warning, idx) in getInsuranceRiskWarning(allJewelry.find(j => j.id === rec.jewelryId) as any).warnings"
+              :key="idx"
+              type="warning"
+              :closable="false"
+              show-icon
+              style="margin-bottom: 6px"
+            >
+              <template #title>{{ warning }}</template>
+            </el-alert>
+          </div>
+
           <el-collapse class="factors-collapse">
             <el-collapse-item title="查看评分详情" name="factors">
               <div v-for="factor in rec.factors" :key="factor.type" class="factor-row">
@@ -558,6 +572,7 @@ import {
   CircleClose,
 } from '@element-plus/icons-vue';
 import { jewelryApi, scheduleApi } from '@/api';
+import { getInsuranceRiskWarning } from '@/utils/risk';
 import type {
   Jewelry,
   JewelryRecommendation,
@@ -1003,7 +1018,8 @@ onMounted(async () => {
 }
 
 .unavailable-reasons,
-.reminders {
+.reminders,
+.insurance-risk-warnings {
   margin-top: 8px;
 }
 

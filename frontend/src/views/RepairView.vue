@@ -84,6 +84,13 @@
           <div v-if="item.notes" class="repair-notes">
             <span>📝 {{ item.notes }}</span>
           </div>
+          <div
+            v-if="getInsuranceRiskWarning(jewelryList.find(j => j.id === item.jewelryId)!).hasRisk"
+            class="repair-insurance-warning"
+          >
+            <el-icon color="#f59e0b" :size="14"><Warning /></el-icon>
+            <span>{{ getInsuranceRiskWarning(jewelryList.find(j => j.id === item.jewelryId)!).warnings[0] }}</span>
+          </div>
           <div class="repair-actions">
             <el-button size="small" @click="openEditDialog(item)" v-if="item.status !== '已完成'">
               更新状态
@@ -202,6 +209,17 @@
           />
         </el-form-item>
       </el-form>
+      <el-alert
+        v-if="repairInsuranceRisk.hasRisk"
+        type="warning"
+        :closable="false"
+        style="margin-top: 12px"
+      >
+        <template #title>保险与估值风险提醒</template>
+        <div v-for="w in repairInsuranceRisk.warnings" :key="w" style="font-size: 13px; line-height: 1.6">
+          ⚠️ {{ w }}
+        </div>
+      </el-alert>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
         <el-button type="primary" @click="handleSubmit">保存</el-button>
@@ -211,10 +229,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
 import { ElMessage, ElMessageBox, type FormInstance } from 'element-plus';
 import { Plus, Delete, Present, Warning } from '@element-plus/icons-vue';
 import { repairApi, jewelryApi } from '@/api';
+import { getInsuranceRiskWarning } from '@/utils/risk';
 import type { Repair, Jewelry } from '@/types';
 
 const repairList = ref<Repair[]>([]);
@@ -329,6 +348,13 @@ const isLentOutById = (id: number) => {
   const j = jewelryList.value.find((j) => j.id === id);
   return j ? isLentOut(j) : false;
 };
+
+const repairInsuranceRisk = computed(() => {
+  if (!formData.jewelryId) return { hasRisk: false, warnings: [] };
+  const jewelry = jewelryList.value.find((j) => j.id === formData.jewelryId);
+  if (!jewelry) return { hasRisk: false, warnings: [] };
+  return getInsuranceRiskWarning(jewelry);
+});
 
 onMounted(() => {
   loadList();
@@ -451,6 +477,18 @@ onMounted(() => {
   background: #fef0f0;
   padding: 6px 10px;
   border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.repair-insurance-warning {
+  margin: 0 16px 12px;
+  padding: 6px 10px;
+  background: #fffbeb;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #b45309;
   display: flex;
   align-items: center;
   gap: 4px;
