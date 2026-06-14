@@ -148,6 +148,89 @@
         </el-card>
       </el-col>
     </el-row>
+
+    <el-divider content-position="left">
+      <span class="divider-title">
+        <el-icon :size="20" color="#a855f7"><Warning /></el-icon>
+        风险预警分析
+      </span>
+    </el-divider>
+
+    <el-row :gutter="16">
+      <el-col :xs="24" :md="12" style="margin-bottom: 16px">
+        <el-card class="card risk-ranking-card" shadow="never">
+          <div class="card-header">
+            <h3><el-icon color="#ef4444"><Rank /></el-icon> 风险首饰排行 TOP10</h3>
+            <el-tag type="danger" effect="light" size="small">按风险评分排序</el-tag>
+          </div>
+          <div v-if="riskStats.rankings && riskStats.rankings.length > 0" class="ranking-list">
+            <div
+              v-for="(item, idx) in riskStats.rankings.slice(0, 10)"
+              :key="item.id"
+              class="ranking-item"
+            >
+              <div class="ranking-rank" :class="'rank-' + (idx + 1)">{{ idx + 1 }}</div>
+              <div class="ranking-info">
+                <div class="ranking-name">
+                  {{ item.name }}
+                  <el-tag size="small" effect="plain">{{ item.material }}</el-tag>
+                </div>
+                <div class="ranking-factor">{{ item.topFactor }}</div>
+              </div>
+              <div class="ranking-score">
+                <el-tag :type="getRiskTagType(item.level)" effect="dark" size="small">
+                  {{ item.levelText }}
+                </el-tag>
+                <div class="score-num">{{ item.score }}分</div>
+              </div>
+            </div>
+          </div>
+          <el-empty v-else description="太棒了！暂无高风险首饰" :image-size="80" />
+        </el-card>
+      </el-col>
+
+      <el-col :xs="24" :md="12" style="margin-bottom: 16px">
+        <el-card class="card risk-material-card" shadow="never">
+          <div class="card-header">
+            <h3><el-icon color="#f59e0b"><DataAnalysis /></el-icon> 高风险材质分布</h3>
+          </div>
+          <div ref="riskMaterialChartRef" class="chart-box"></div>
+        </el-card>
+      </el-col>
+
+      <el-col :xs="24" style="margin-bottom: 16px">
+        <el-card class="card reminders-card" shadow="never">
+          <div class="card-header">
+            <h3><el-icon color="#ef4444"><Alert /></el-icon> 待处理提醒总览</h3>
+            <el-tag v-if="riskStats.pendingReminders" type="danger" effect="dark" size="small">
+              共 {{ riskStats.pendingReminders.length }} 条待处理
+            </el-tag>
+          </div>
+          <div v-if="riskStats.pendingReminders && riskStats.pendingReminders.length > 0" class="reminders-grid">
+            <div
+              v-for="(reminder, idx) in riskStats.pendingReminders"
+              :key="idx"
+              class="reminder-card"
+              :class="'reminder-' + reminder.level"
+            >
+              <div class="reminder-icon">
+                <span class="icon-text">{{ getReminderTypeInfo(reminder.type).icon }}</span>
+              </div>
+              <div class="reminder-content">
+                <div class="reminder-title">
+                  {{ reminder.title }}
+                  <el-tag :type="getRiskTagType(reminder.level)" size="small" effect="dark">
+                    {{ getRiskLevelInfo(reminder.level).text }}
+                  </el-tag>
+                </div>
+                <div class="reminder-desc">{{ reminder.description }}</div>
+              </div>
+            </div>
+          </div>
+          <el-empty v-else description="太棒了！暂无待处理提醒" :image-size="80" />
+        </el-card>
+      </el-col>
+    </el-row>
   </div>
 </template>
 
@@ -164,12 +247,17 @@ import {
   TrendCharts,
   Bell,
   CollectionTag,
+  Rank,
+  Alert,
+  DataAnalysis,
 } from '@element-plus/icons-vue';
-import { statsApi } from '@/api';
-import type { AllStats } from '@/types';
+import { statsApi, jewelryApi } from '@/api';
+import type { AllStats, RiskStats } from '@/types';
+import { getRiskLevelInfo, getRiskTagType, getReminderTypeInfo } from '@/utils/risk';
 
 const idleDays = ref(30);
 const data = reactive<Partial<AllStats>>({});
+const riskStats = ref<Partial<RiskStats>>({});
 
 const maxComboCount = computed(() => {
   const items = data.topOutfitCombinations?.combinations || [];
@@ -179,24 +267,37 @@ const maxComboCount = computed(() => {
 const materialChartRef = ref<HTMLElement>();
 const problemChartRef = ref<HTMLElement>();
 const comboChartRef = ref<HTMLElement>();
+const riskMaterialChartRef = ref<HTMLElement>();
 
 let materialChart: echarts.ECharts | null = null;
 let problemChart: echarts.ECharts | null = null;
 let comboChart: echarts.ECharts | null = null;
+let riskMaterialChart: echarts.ECharts | null = null;
 
 const purplePalette = ['#a855f7', '#c084fc', '#e879f9', '#8b5cf6', '#7c3aed', '#6d28d9', '#5b21b6', '#4c1d95'];
 
 const loadData = async () => {
-  const res = await statsApi.all(idleDays.value);
-  Object.assign(data, res);
+  const [stats, risk] = await Promise.all([
+    statsApi.all(idleDays.value),
+    jewelryApi.getRiskStats().catch(() => null),
+  ]);
+  Object.assign(data, stats);
+  if (risk) {
+    riskStats.value = risk;
+  }
   await nextTick();
   renderCharts();
+  renderRiskCharts();
 };
 
 const renderCharts = () => {
   renderMaterialChart();
   renderProblemChart();
   renderComboChart();
+};
+
+const renderRiskCharts = () => {
+  renderRiskMaterialChart();
 };
 
 const renderMaterialChart = () => {
@@ -363,10 +464,72 @@ const renderComboChart = () => {
 
 const formatDate = (d: string) => d?.split('T')[0] || '';
 
+const renderRiskMaterialChart = () => {
+  if (!riskMaterialChartRef.value) return;
+  if (!riskMaterialChart) {
+    riskMaterialChart = echarts.init(riskMaterialChartRef.value);
+  }
+  const items = riskStats.value?.highRiskMaterials || [];
+  const riskColors = ['#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16'];
+  riskMaterialChart.setOption({
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' },
+      formatter: (params: any) => {
+        const p = params[0];
+        const item = items[p.dataIndex];
+        return `${item.material}<br/>平均风险分: ${item.averageScore}<br/>高风险数量: ${item.highRiskCount}/${item.count}`;
+      },
+    },
+    grid: {
+      left: '3%',
+      right: '4%',
+      bottom: '3%',
+      top: '8%',
+      containLabel: true,
+    },
+    xAxis: {
+      type: 'category',
+      data: items.length > 0 ? items.map((i) => i.material) : ['暂无数据'],
+      axisLabel: { color: '#6b4c8a', interval: 0 },
+      axisLine: { lineStyle: { color: '#e9d5ff' } },
+    },
+    yAxis: {
+      type: 'value',
+      name: '平均风险分',
+      axisLabel: { color: '#6b4c8a' },
+      splitLine: { lineStyle: { color: '#f3e8ff', type: 'dashed' } },
+    },
+    series: [
+      {
+        name: '平均风险分',
+        type: 'bar',
+        barWidth: '50%',
+        itemStyle: {
+          borderRadius: [6, 6, 0, 0],
+          color: (params: any) => riskColors[params.dataIndex % riskColors.length],
+        },
+        label: {
+          show: true,
+          position: 'top',
+          color: '#4c1d95',
+          fontWeight: 'bold',
+          formatter: (params: any) => {
+            const item = items[params.dataIndex];
+            return `${item.averageScore}分\n(${item.highRiskCount}件高风险)`;
+          },
+        },
+        data: items.length > 0 ? items.map((i) => i.averageScore) : [0],
+      },
+    ],
+  });
+};
+
 const handleResize = () => {
   materialChart?.resize();
   problemChart?.resize();
   comboChart?.resize();
+  riskMaterialChart?.resize();
 };
 
 onMounted(async () => {
@@ -379,6 +542,7 @@ onBeforeUnmount(() => {
   materialChart?.dispose();
   problemChart?.dispose();
   comboChart?.dispose();
+  riskMaterialChart?.dispose();
 });
 </script>
 
@@ -608,5 +772,194 @@ onBeforeUnmount(() => {
   font-weight: 600;
   color: #7c3aed;
   font-size: 14px;
+}
+
+.divider-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #4c1d95;
+}
+
+.risk-ranking-card,
+.risk-material-card,
+.reminders-card {
+  min-height: 380px;
+  display: flex;
+  flex-direction: column;
+}
+
+.ranking-list {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.ranking-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: linear-gradient(135deg, #faf5ff, #fff);
+  border: 1px solid #e9d5ff;
+  border-radius: 10px;
+  margin-bottom: 10px;
+  transition: all 0.2s;
+}
+
+.ranking-item:hover {
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.12);
+}
+
+.ranking-rank {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #e9d5ff;
+  color: #6d28d9;
+  font-weight: 700;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ranking-rank.rank-1 {
+  background: linear-gradient(135deg, #fde047, #f59e0b);
+  color: #fff;
+}
+
+.ranking-rank.rank-2 {
+  background: linear-gradient(135deg, #e5e7eb, #9ca3af);
+  color: #fff;
+}
+
+.ranking-rank.rank-3 {
+  background: linear-gradient(135deg, #fed7aa, #ea580c);
+  color: #fff;
+}
+
+.ranking-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.ranking-name {
+  font-weight: 600;
+  color: #4c1d95;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.ranking-factor {
+  font-size: 12px;
+  color: #8b5cf6;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ranking-score {
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.score-num {
+  font-size: 18px;
+  font-weight: 700;
+  color: #ef4444;
+  margin-top: 4px;
+}
+
+.reminders-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
+  max-height: 400px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.reminder-card {
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 10px;
+  border-left: 4px solid #a855f7;
+  background: linear-gradient(135deg, #faf5ff, #fff);
+  transition: all 0.2s;
+}
+
+.reminder-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.15);
+}
+
+.reminder-card.reminder-critical {
+  border-left-color: #ef4444;
+  background: linear-gradient(135deg, #fef2f2, #fff);
+}
+
+.reminder-card.reminder-high {
+  border-left-color: #f97316;
+  background: linear-gradient(135deg, #fff7ed, #fff);
+}
+
+.reminder-card.reminder-medium {
+  border-left-color: #f59e0b;
+  background: linear-gradient(135deg, #fffbeb, #fff);
+}
+
+.reminder-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #e9d5ff, #c084fc);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.reminder-critical .reminder-icon {
+  background: linear-gradient(135deg, #fecaca, #f87171);
+}
+
+.reminder-high .reminder-icon {
+  background: linear-gradient(135deg, #fed7aa, #fb923c);
+}
+
+.reminder-medium .reminder-icon {
+  background: linear-gradient(135deg, #fef08a, #facc15);
+}
+
+.icon-text {
+  font-size: 20px;
+}
+
+.reminder-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.reminder-title {
+  font-weight: 600;
+  color: #4c1d95;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.reminder-desc {
+  font-size: 13px;
+  color: #6b4c8a;
+  line-height: 1.5;
 }
 </style>

@@ -171,13 +171,22 @@
             <el-option label="已完成" value="已完成" />
           </el-select>
         </el-form-item>
-        <el-form-item label="取件日期" v-if="formData.status !== '维修中'">
+        <el-form-item
+          label="取件日期"
+          v-if="formData.status !== '维修中'"
+          prop="returnDate"
+          :rules="formData.status === '已完成' ? [{ required: true, message: '维修已完成时取件日期为必填项' }] : []"
+        >
           <el-date-picker
             v-model="formData.returnDate"
             type="date"
             style="width: 100%"
             value-format="YYYY-MM-DD"
+            :placeholder="formData.status === '已完成' ? '请选择取件日期（必填）' : '请选择取件日期（可选）'"
           />
+          <div v-if="formData.status === '已完成'" class="required-hint">
+            ⚠️ 维修标记为已完成时必须填写取件日期
+          </div>
         </el-form-item>
         <el-form-item label="备注">
           <el-input
@@ -264,6 +273,10 @@ const openEditDialog = (item: Repair) => {
 };
 
 const handleSubmit = async () => {
+  if (formData.status === '已完成' && !formData.returnDate) {
+    ElMessage.error('维修已完成时必须填写取件日期');
+    return;
+  }
   await formRef.value?.validate();
   const data: any = { ...formData };
   if (editingItem.value) {
@@ -409,5 +422,14 @@ onMounted(() => {
 
 .muted {
   color: #9ca3af;
+}
+
+.required-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #f56c6c;
+  background: #fef0f0;
+  padding: 6px 10px;
+  border-radius: 4px;
 }
 </style>

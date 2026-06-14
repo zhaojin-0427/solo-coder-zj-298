@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { CreateRepairDto, UpdateRepairDto } from './dto';
 
@@ -7,6 +7,9 @@ export class RepairService {
   constructor(private prisma: PrismaService) {}
 
   async create(dto: CreateRepairDto) {
+    if (dto.status === '已完成' && !dto.returnDate) {
+      throw new BadRequestException('维修已完成时必须填写取件日期');
+    }
     const data: any = {
       jewelryId: dto.jewelryId,
       problemType: dto.problemType,
@@ -44,6 +47,16 @@ export class RepairService {
   }
 
   async update(id: number, dto: UpdateRepairDto) {
+    const existing = await this.prisma.repair.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('维修记录不存在');
+    
+    const newStatus = dto.status || existing.status;
+    const newReturnDate = dto.returnDate || existing.returnDate;
+    
+    if (newStatus === '已完成' && !newReturnDate) {
+      throw new BadRequestException('维修已完成时必须填写取件日期');
+    }
+    
     const data: any = { ...dto };
     if (dto.returnDate) data.returnDate = new Date(dto.returnDate);
     return this.prisma.repair.update({ where: { id }, data });

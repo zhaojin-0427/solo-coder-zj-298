@@ -1,4 +1,4 @@
-import { IsString, IsDateString, IsInt, IsOptional, IsNumber, IsEnum } from 'class-validator';
+import { IsString, IsDateString, IsInt, IsOptional, IsNumber, ValidateIf } from 'class-validator';
 
 export class CreateRepairDto {
   @IsInt()
@@ -16,6 +16,8 @@ export class CreateRepairDto {
   @IsNumber()
   cost: number;
 
+  @ValidateIf((o) => o.status === '已完成')
+  @IsDateString({}, { message: '维修已完成时取件日期为必填项' })
   @IsOptional()
   @IsDateString()
   returnDate?: string;
@@ -33,6 +35,8 @@ export class UpdateRepairDto {
   @IsString()
   status?: string;
 
+  @ValidateIf((o) => o.status === '已完成')
+  @IsDateString({}, { message: '维修已完成时取件日期为必填项' })
   @IsOptional()
   @IsDateString()
   returnDate?: string;

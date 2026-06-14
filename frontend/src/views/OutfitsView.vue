@@ -175,9 +175,10 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue';
 import { ElMessage, ElMessageBox, type FormInstance } from 'element-plus';
-import { Plus, Delete, Calendar } from '@element-plus/icons-vue';
+import { Plus, Delete, Calendar, Warning } from '@element-plus/icons-vue';
 import { outfitApi, jewelryApi } from '@/api';
-import type { Outfit, Jewelry } from '@/types';
+import type { Outfit, Jewelry, RiskAssessment } from '@/types';
+import { calculateRiskLocally, getRiskLevelInfo } from '@/utils/risk';
 
 const outfitList = ref<Outfit[]>([]);
 const jewelryList = ref<Jewelry[]>([]);
@@ -232,7 +233,45 @@ const handleSubmit = async () => {
     cleanStatus: formData.cleanStatus,
     notes: formData.notes,
   };
-  await outfitApi.create(data);
+  const result = await outfitApi.create(data);
+  
+  if (formData.isAllergic || formData.isFading) {
+    try {
+      const jewelry = await jewelryApi.detail(formData.jewelryId!);
+      const oldOutfits = jewelry.outfits?.filter(o => o.id !== result.id) || [];
+      const oldRisk = calculateRiskLocally({ ...jewelry, outfits: oldOutfits });
+      const newRisk = calculateRiskLocally({ ...jewelry, outfits: [...oldOutfits, result as Outfit] });
+      
+      const riskIncreased = newRisk.score > oldRisk.score;
+      const levelChanged = oldRisk.level !== newRisk.level;
+      
+      let warningMsg = '';
+      if (formData.isAllergic && formData.isFading) {
+        warningMsg = '本次记录了过敏反应和掉色问题';
+      } else if (formData.isAllergic) {
+        warningMsg = '本次记录了过敏反应';
+      } else {
+        warningMsg = '本次记录了掉色问题';
+      }
+      
+      if (levelChanged) {
+        warningMsg += `，风险等级已从「${oldRisk.levelText}」提升至「${newRisk.levelText}」！`;
+      } else if (riskIncreased) {
+        warningMsg += `，风险评分已从${oldRisk.score}分上升至${newRisk.score}分。`;
+      }
+      
+      ElMessageBox({
+        title: '⚠️ 风险提醒',
+        message: warningMsg + '\n\n建议：该首饰可能不适合经常佩戴，请考虑进行专业保养或减少佩戴频率。',
+        type: 'warning',
+        confirmButtonText: '我知道了',
+        showCancelButton: false,
+      });
+    } catch (e) {
+      console.error('计算风险变化失败', e);
+    }
+  }
+  
   ElMessage.success('记录成功');
   dialogVisible.value = false;
   loadList();

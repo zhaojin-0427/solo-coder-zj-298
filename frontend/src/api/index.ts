@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Jewelry, Outfit, Maintenance, Repair, AllStats } from '../types';
+import type { Jewelry, Outfit, Maintenance, Repair, AllStats, RiskAssessment, RiskStats } from '../types';
 
 const api = axios.create({
   baseURL: '/api',
@@ -13,6 +13,9 @@ export const jewelryApi = {
   update: (id: number, data: Partial<Jewelry>) =>
     api.put<Jewelry>(`/jewelry/${id}`, data).then((r) => r.data),
   delete: (id: number) => api.delete(`/jewelry/${id}`).then((r) => r.data),
+  getRisk: (id: number) => api.get<RiskAssessment>(`/jewelry/${id}/risk`).then((r) => r.data),
+  getAllRisk: () => api.get<RiskAssessment[]>('/jewelry/risk/all').then((r) => r.data),
+  getRiskStats: () => api.get<RiskStats>('/jewelry/risk/stats').then((r) => r.data),
 };
 
 export const outfitApi = {

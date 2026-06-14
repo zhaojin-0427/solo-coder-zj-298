@@ -1,10 +1,14 @@
 import { Controller, Get, Post, Body, Param, Delete, Put, ParseIntPipe } from '@nestjs/common';
 import { JewelryService } from './jewelry.service';
+import { RiskService } from './risk.service';
 import { CreateJewelryDto, UpdateJewelryDto } from './dto';
 
 @Controller('api/jewelry')
 export class JewelryController {
-  constructor(private readonly service: JewelryService) {}
+  constructor(
+    private readonly service: JewelryService,
+    private readonly riskService: RiskService,
+  ) {}
 
   @Post()
   create(@Body() dto: CreateJewelryDto) {
@@ -29,5 +33,20 @@ export class JewelryController {
   @Delete(':id')
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.service.remove(id);
+  }
+
+  @Get(':id/risk')
+  getRiskAssessment(@Param('id', ParseIntPipe) id: number) {
+    return this.riskService.assessJewelry(id);
+  }
+
+  @Get('risk/all')
+  getAllRiskAssessments() {
+    return this.riskService.assessAllJewelry();
+  }
+
+  @Get('risk/stats')
+  getRiskStats() {
+    return this.riskService.getRiskStats();
   }
 }
