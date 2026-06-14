@@ -201,7 +201,7 @@
       <el-col :xs="24" style="margin-bottom: 16px">
         <el-card class="card reminders-card" shadow="never">
           <div class="card-header">
-            <h3><el-icon color="#ef4444"><Alert /></el-icon> 待处理提醒总览</h3>
+            <h3><el-icon color="#ef4444"><WarningFilled /></el-icon> 待处理提醒总览</h3>
             <el-tag v-if="riskStats.pendingReminders" type="danger" effect="dark" size="small">
               共 {{ riskStats.pendingReminders.length }} 条待处理
             </el-tag>
@@ -248,7 +248,7 @@ import {
   Bell,
   CollectionTag,
   Rank,
-  Alert,
+  WarningFilled,
   DataAnalysis,
 } from '@element-plus/icons-vue';
 import { statsApi, jewelryApi } from '@/api';
