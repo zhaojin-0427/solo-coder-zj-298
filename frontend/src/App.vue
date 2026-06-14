@@ -29,6 +29,10 @@
           <el-icon><Tools /></el-icon>
           <span>维修追踪</span>
         </el-menu-item>
+        <el-menu-item index="/lending">
+          <el-icon><Van /></el-icon>
+          <span>借还管理</span>
+        </el-menu-item>
         <el-menu-item index="/stats">
           <el-icon><DataAnalysis /></el-icon>
           <span>数据统计</span>
@@ -53,7 +57,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
-import { Present, Handbag, MagicStick, Tools, DataAnalysis } from '@element-plus/icons-vue';
+import { Present, Handbag, MagicStick, Tools, DataAnalysis, Van } from '@element-plus/icons-vue';
 
 const route = useRoute();
 const activeMenu = computed(() => route.path);

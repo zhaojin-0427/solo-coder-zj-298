@@ -80,8 +80,13 @@
               :key="j.id"
               :label="`${j.name} (${j.material})`"
               :value="j.id"
+              :disabled="isLentOut(j)"
             />
           </el-select>
+          <div v-if="formData.jewelryId && isLentOutById(formData.jewelryId)" class="lending-warning">
+            <el-icon color="#ef4444"><Warning /></el-icon>
+            <span>该首饰当前已被借出，暂无法进行养护操作</span>
+          </div>
         </el-form-item>
         <el-form-item label="养护日期" prop="date" :rules="[{ required: true, message: '请选择日期' }]">
           <el-date-picker
@@ -236,6 +241,12 @@ const typeTagType = (type: string) => {
   return map[type] || 'info';
 };
 
+const isLentOut = (j: Jewelry) => j.lendings && j.lendings.length > 0;
+const isLentOutById = (id: number) => {
+  const j = jewelryList.value.find((j) => j.id === id);
+  return j ? isLentOut(j) : false;
+};
+
 onMounted(() => {
   loadList();
   loadJewelry();
@@ -283,5 +294,17 @@ onMounted(() => {
   padding: 8px 12px;
   background: #faf5ff;
   border-radius: 6px;
+}
+
+.lending-warning {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #f56c6c;
+  background: #fef0f0;
+  padding: 6px 10px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 </style>

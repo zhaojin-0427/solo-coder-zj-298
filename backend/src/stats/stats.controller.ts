@@ -34,4 +34,9 @@ export class StatsController {
   getIdleJewelry(@Query('days') days?: string) {
     return this.service.getLongIdleJewelry(days ? parseInt(days) : 30);
   }
+
+  @Get('lending')
+  getLendingStats() {
+    return this.service.getLendingStats();
+  }
 }

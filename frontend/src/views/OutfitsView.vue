@@ -103,8 +103,13 @@
               :key="j.id"
               :label="`${j.name} (${j.material})`"
               :value="j.id"
+              :disabled="isLentOut(j)"
             />
           </el-select>
+          <div v-if="formData.jewelryId && isLentOutById(formData.jewelryId)" class="lending-warning">
+            <el-icon color="#ef4444"><Warning /></el-icon>
+            <span>该首饰当前已被借出，不建议记录穿搭</span>
+          </div>
         </el-form-item>
         <el-form-item label="佩戴日期" prop="wearDate" :rules="[{ required: true, message: '请选择日期' }]">
           <el-date-picker
@@ -178,7 +183,6 @@ import { ElMessage, ElMessageBox, type FormInstance } from 'element-plus';
 import { Plus, Delete, Calendar, Warning } from '@element-plus/icons-vue';
 import { outfitApi, jewelryApi } from '@/api';
 import type { Outfit, Jewelry, RiskAssessment } from '@/types';
-import { calculateRiskLocally, getRiskLevelInfo } from '@/utils/risk';
 
 const outfitList = ref<Outfit[]>([]);
 const jewelryList = ref<Jewelry[]>([]);
@@ -304,6 +308,12 @@ const cleanTagType = (status: string) => {
   return map[status] || 'info';
 };
 
+const isLentOut = (j: Jewelry) => j.lendings && j.lendings.length > 0;
+const isLentOutById = (id: number) => {
+  const j = jewelryList.value.find((j) => j.id === id);
+  return j ? isLentOut(j) : false;
+};
+
 onMounted(() => {
   loadList();
   loadJewelry();
@@ -329,5 +339,17 @@ onMounted(() => {
 
 .muted {
   color: #9ca3af;
+}
+
+.lending-warning {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #f56c6c;
+  background: #fef0f0;
+  padding: 6px 10px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 </style>

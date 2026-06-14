@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Jewelry, Outfit, Maintenance, Repair, AllStats, RiskAssessment, RiskStats } from '../types';
+import type { Jewelry, Outfit, Maintenance, Repair, AllStats, RiskAssessment, RiskStats, Lending, LendingStats } from '../types';
 
 const api = axios.create({
   baseURL: '/api',
@@ -44,4 +44,16 @@ export const repairApi = {
 
 export const statsApi = {
   all: (days = 30) => api.get<AllStats>('/stats', { params: { days } }).then((r) => r.data),
+  lending: () => api.get<LendingStats>('/stats/lending').then((r) => r.data),
+};
+
+export const lendingApi = {
+  list: (params?: { status?: string; jewelryId?: number }) =>
+    api.get<Lending[]>('/lendings', { params }).then((r) => r.data),
+  detail: (id: number) => api.get<Lending>(`/lendings/${id}`).then((r) => r.data),
+  create: (data: Partial<Lending>) => api.post<Lending>('/lendings', data).then((r) => r.data),
+  returnJewelry: (id: number, data: Partial<Lending>) =>
+    api.put<Lending>(`/lendings/${id}/return`, data).then((r) => r.data),
+  checkOverdue: () => api.get('/lendings/overdue-check').then((r) => r.data),
+  delete: (id: number) => api.delete(`/lendings/${id}`).then((r) => r.data),
 };

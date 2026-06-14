@@ -11,6 +11,7 @@ export interface Jewelry {
   outfits?: Outfit[];
   maintenances?: Maintenance[];
   repairs?: Repair[];
+  lendings?: Lending[];
   _count?: {
     outfits: number;
     maintenances: number;
@@ -156,6 +157,62 @@ export interface RiskStats {
   rankings: RiskJewelryRanking[];
   pendingReminders: PendingReminder[];
   highRiskMaterials: HighRiskMaterial[];
+}
+
+export interface Lending {
+  id: number;
+  jewelryId: number;
+  borrowerName: string;
+  borrowerContact: string;
+  lendDate: string;
+  expectedReturnDate: string;
+  purpose: string;
+  deposit: number;
+  conditionBeforeLend: string;
+  returnCondition?: string;
+  hasWear: boolean;
+  compensationAmount: number;
+  status: string;
+  actualReturnDate?: string;
+  notes?: string;
+  createdAt: string;
+  jewelry?: {
+    id: number;
+    name: string;
+    material: string;
+  };
+}
+
+export interface LendingRankingItem {
+  name: string;
+  count: number;
+}
+
+export interface OverdueReminder {
+  id: number;
+  jewelryId: number;
+  jewelryName: string;
+  borrowerName: string;
+  borrowerContact: string;
+  expectedReturnDate: string;
+  overdueDays: number;
+  status: string;
+}
+
+export interface WearDistribution {
+  type: string;
+  count: number;
+}
+
+export interface LendingStats {
+  lendingRanking: LendingRankingItem[];
+  overdueReminders: OverdueReminder[];
+  wearDistribution: WearDistribution[];
+  totalDeposit: number;
+  totalCompensation: number;
+  totalLendings: number;
+  activeLendings: number;
+  overdueLendings: number;
 }
 
 export interface AllStats {

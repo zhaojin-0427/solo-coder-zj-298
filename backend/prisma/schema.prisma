@@ -20,6 +20,7 @@ model Jewelry {
   outfits       Outfit[]
   maintenances  Maintenance[]
   repairs       Repair[]
+  lendings      Lending[]
 }
 
 model Outfit {
@@ -58,4 +59,24 @@ model Repair {
   notes         String?
   createdAt     DateTime @default(now())
   jewelry       Jewelry  @relation(fields: [jewelryId], references: [id], onDelete: Cascade)
+}
+
+model Lending {
+  id                    Int      @id @default(autoincrement())
+  jewelryId             Int
+  borrowerName          String
+  borrowerContact       String
+  lendDate              DateTime
+  expectedReturnDate    DateTime
+  purpose               String
+  deposit               Float    @default(0)
+  conditionBeforeLend   String
+  returnCondition       String?
+  hasWear               Boolean  @default(false)
+  compensationAmount    Float    @default(0)
+  status                String   @default("借出中")
+  actualReturnDate      DateTime?
+  notes                 String?
+  createdAt             DateTime @default(now())
+  jewelry               Jewelry  @relation(fields: [jewelryId], references: [id], onDelete: Cascade)
 }

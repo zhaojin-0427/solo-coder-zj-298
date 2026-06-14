@@ -5,6 +5,58 @@ import { PrismaService } from '../common/prisma.service';
 export class StatsService {
   constructor(private prisma: PrismaService) {}
 
+  async getLendingStats() {
+    const [lendings, totalDeposit, totalCompensation] = await Promise.all([
+      this.prisma.lending.findMany({
+        include: { jewelry: { select: { id: true, name: true, material: true } } },
+      }),
+      this.prisma.lending.aggregate({ _sum: { deposit: true } }),
+      this.prisma.lending.aggregate({ _sum: { compensationAmount: true } }),
+    ]);
+
+    const borrowCountMap = new Map<string, { name: string; count: number }>();
+    for (const l of lendings) {
+      const key = l.borrowerName;
+      const existing = borrowCountMap.get(key) || { name: key, count: 0 };
+      existing.count += 1;
+      borrowCountMap.set(key, existing);
+    }
+    const lendingRanking = Array.from(borrowCountMap.values())
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
+    const now = new Date();
+    const overdueReminders = lendings
+      .filter((l) => (l.status === '借出中' || l.status === '逾期未还') && new Date(l.expectedReturnDate) < now)
+      .map((l) => ({
+        id: l.id,
+        jewelryId: l.jewelryId,
+        jewelryName: l.jewelry.name,
+        borrowerName: l.borrowerName,
+        borrowerContact: l.borrowerContact,
+        expectedReturnDate: l.expectedReturnDate,
+        overdueDays: Math.floor((now.getTime() - new Date(l.expectedReturnDate).getTime()) / (1000 * 60 * 60 * 24)),
+        status: l.status,
+      }));
+
+    const wearDistribution = [
+      { type: '有损耗', count: lendings.filter((l) => l.hasWear).length },
+      { type: '无损耗', count: lendings.filter((l) => !l.hasWear && l.status === '已归还').length },
+      { type: '借出中', count: lendings.filter((l) => l.status === '借出中' || l.status === '逾期未还').length },
+    ];
+
+    return {
+      lendingRanking,
+      overdueReminders,
+      wearDistribution,
+      totalDeposit: totalDeposit._sum.deposit || 0,
+      totalCompensation: totalCompensation._sum.compensationAmount || 0,
+      totalLendings: lendings.length,
+      activeLendings: lendings.filter((l) => l.status === '借出中').length,
+      overdueLendings: lendings.filter((l) => l.status === '逾期未还').length,
+    };
+  }
+
   async getMaterialWearFrequency() {
     const outfits = await this.prisma.outfit.findMany({
       include: { jewelry: { select: { material: true } } },

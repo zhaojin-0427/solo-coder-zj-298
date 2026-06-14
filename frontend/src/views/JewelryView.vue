@@ -16,6 +16,11 @@
         style="margin-bottom: 16px"
       >
         <div class="card jewelry-card" @click="showDetail(item)">
+          <div v-if="item.lendings && item.lendings.length > 0" class="lending-badge">
+            <el-tag type="danger" effect="dark" size="small" round>
+              {{ item.lendings[0].status === '逾期未还' ? '逾期未还' : '已借出' }}
+            </el-tag>
+          </div>
           <div class="jewelry-avatar">
             <el-icon :size="36" color="#a855f7"><Present /></el-icon>
           </div>
@@ -40,6 +45,11 @@
             <el-icon><Calendar /></el-icon>
             <span>{{ formatDate(item.purchaseDate) }}</span>
           </p>
+          <div v-if="item.lendings && item.lendings.length > 0" class="jewelry-lending-info">
+            <el-icon color="#ef4444"><User /></el-icon>
+            <span>借用人: {{ item.lendings[0].borrowerName }}</span>
+            <span class="lending-return-date">预计 {{ formatDate(item.lendings[0].expectedReturnDate) }} 归还</span>
+          </div>
           <div class="jewelry-stats">
             <span>{{ item._count?.outfits || 0 }}次佩戴</span>
             <span>{{ item._count?.maintenances || 0 }}次养护</span>
@@ -134,6 +144,17 @@
           <el-descriptions-item label="购买时间">{{ formatDate(currentDetail.purchaseDate) }}</el-descriptions-item>
           <el-descriptions-item label="收纳位置">{{ currentDetail.storageLocation }}</el-descriptions-item>
           <el-descriptions-item label="适配场景">{{ currentDetail.suitableScenarios }}</el-descriptions-item>
+          <el-descriptions-item label="借出状态">
+            <template v-if="currentDetail.lendings && currentDetail.lendings.length > 0">
+              <el-tag :type="currentDetail.lendings[0].status === '逾期未还' ? 'danger' : 'warning'" effect="dark">
+                {{ currentDetail.lendings[0].status }}
+              </el-tag>
+              <span style="margin-left: 8px; color: #6b4c8a">
+                借用人: {{ currentDetail.lendings[0].borrowerName }} | 预计归还: {{ formatDate(currentDetail.lendings[0].expectedReturnDate) }}
+              </span>
+            </template>
+            <el-tag v-else type="success" effect="light">在库</el-tag>
+          </el-descriptions-item>
         </el-descriptions>
 
         <div v-if="currentRisk" class="risk-section">
@@ -202,7 +223,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue';
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus';
-import { Plus, Delete, Present, Location, Calendar, Warning, Bell, CircleCheck } from '@element-plus/icons-vue';
+import { Plus, Delete, Present, Location, Calendar, Warning, Bell, CircleCheck, User } from '@element-plus/icons-vue';
 import { jewelryApi } from '@/api';
 import type { Jewelry, RiskAssessment } from '@/types';
 import { calculateRiskLocally, getRiskLevelInfo, getRiskTagType } from '@/utils/risk';
@@ -328,6 +349,26 @@ onMounted(loadList);
 .jewelry-card:hover {
   transform: translateY(-4px);
   box-shadow: 0 8px 24px rgba(168, 85, 247, 0.15);
+}
+.lending-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+.jewelry-lending-info {
+  font-size: 12px;
+  color: #ef4444;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: #fef2f2;
+  border-radius: 4px;
+}
+.lending-return-date {
+  color: #9ca3af;
+  margin-left: 4px;
 }
 .jewelry-avatar {
   width: 64px;

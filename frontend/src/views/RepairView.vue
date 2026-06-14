@@ -120,8 +120,13 @@
                 :key="j.id"
                 :label="`${j.name} (${j.material})`"
                 :value="j.id"
+                :disabled="isLentOut(j)"
               />
             </el-select>
+            <div v-if="formData.jewelryId && isLentOutById(formData.jewelryId)" class="lending-warning">
+              <el-icon color="#ef4444"><Warning /></el-icon>
+              <span>该首饰当前已被借出，需等归还后再送修</span>
+            </div>
           </el-form-item>
           <div class="form-section-title">维修详情</div>
           <el-form-item label="问题类型" prop="problemType" :rules="[{ required: true, message: '请选择问题类型' }]">
@@ -208,7 +213,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue';
 import { ElMessage, ElMessageBox, type FormInstance } from 'element-plus';
-import { Plus, Delete, Present } from '@element-plus/icons-vue';
+import { Plus, Delete, Present, Warning } from '@element-plus/icons-vue';
 import { repairApi, jewelryApi } from '@/api';
 import type { Repair, Jewelry } from '@/types';
 
@@ -318,6 +323,12 @@ const statusType = (status: string) => {
 };
 
 const statusClass = (status: string) => `status-${status}`;
+
+const isLentOut = (j: Jewelry) => j.lendings && j.lendings.length > 0;
+const isLentOutById = (id: number) => {
+  const j = jewelryList.value.find((j) => j.id === id);
+  return j ? isLentOut(j) : false;
+};
 
 onMounted(() => {
   loadList();
@@ -431,5 +442,17 @@ onMounted(() => {
   background: #fef0f0;
   padding: 6px 10px;
   border-radius: 4px;
+}
+
+.lending-warning {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #f56c6c;
+  background: #fef0f0;
+  padding: 6px 10px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 </style>

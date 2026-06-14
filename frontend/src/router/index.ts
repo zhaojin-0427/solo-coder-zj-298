@@ -27,6 +27,12 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '维修追踪', icon: 'Tools' },
   },
   {
+    path: '/lending',
+    name: 'Lending',
+    component: () => import('@/views/LendingView.vue'),
+    meta: { title: '借还管理', icon: 'Van' },
+  },
+  {
     path: '/stats',
     name: 'Stats',
     component: () => import('@/views/StatsView.vue'),

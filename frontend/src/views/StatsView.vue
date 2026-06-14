@@ -151,6 +151,115 @@
 
     <el-divider content-position="left">
       <span class="divider-title">
+        <el-icon :size="20" color="#06b6d4"><Van /></el-icon>
+        借还数据统计
+      </span>
+    </el-divider>
+
+    <el-row :gutter="16" style="margin-bottom: 16px">
+      <el-col :xs="12" :sm="12" :md="6">
+        <div class="stat-card">
+          <el-icon :size="28" color="#06b6d4"><Van /></el-icon>
+          <div class="label">借出总次数</div>
+          <div class="value">{{ lendingStats.totalLendings || 0 }}</div>
+        </div>
+      </el-col>
+      <el-col :xs="12" :sm="12" :md="6">
+        <div class="stat-card">
+          <el-icon :size="28" color="#f59e0b"><Bell /></el-icon>
+          <div class="label">当前借出中</div>
+          <div class="value">{{ lendingStats.activeLendings || 0 }}</div>
+        </div>
+      </el-col>
+      <el-col :xs="12" :sm="12" :md="6">
+        <div class="stat-card">
+          <el-icon :size="28" color="#ef4444"><Warning /></el-icon>
+          <div class="label">逾期未还</div>
+          <div class="value">{{ lendingStats.overdueLendings || 0 }}</div>
+        </div>
+      </el-col>
+      <el-col :xs="12" :sm="12" :md="6">
+        <div class="stat-card">
+          <el-icon :size="28" color="#10b981"><Money /></el-icon>
+          <div class="label">押金/补偿</div>
+          <div class="value">¥{{ (lendingStats.totalDeposit || 0).toFixed(0) }} / ¥{{ (lendingStats.totalCompensation || 0).toFixed(0) }}</div>
+        </div>
+      </el-col>
+    </el-row>
+
+    <el-row :gutter="16">
+      <el-col :xs="24" :md="12" style="margin-bottom: 16px">
+        <el-card class="card lending-ranking-card" shadow="never">
+          <div class="card-header">
+            <h3><el-icon color="#06b6d4"><Rank /></el-icon> 借出次数排行 TOP10</h3>
+          </div>
+          <div v-if="lendingStats.lendingRanking && lendingStats.lendingRanking.length > 0" class="ranking-list">
+            <div
+              v-for="(item, idx) in lendingStats.lendingRanking"
+              :key="item.name"
+              class="ranking-item"
+            >
+              <div class="ranking-rank" :class="'rank-' + (idx + 1)">{{ idx + 1 }}</div>
+              <div class="ranking-info">
+                <div class="ranking-name">{{ item.name }}</div>
+              </div>
+              <div class="ranking-score">
+                <div class="score-num" style="color: #06b6d4">{{ item.count }}次</div>
+              </div>
+            </div>
+          </div>
+          <el-empty v-else description="暂无借出数据" :image-size="80" />
+        </el-card>
+      </el-col>
+
+      <el-col :xs="24" :md="12" style="margin-bottom: 16px">
+        <el-card class="card chart-card" shadow="never">
+          <div class="card-header">
+            <h3><el-icon color="#8b5cf6"><PieChart /></el-icon> 借出损耗分布</h3>
+          </div>
+          <div ref="wearChartRef" class="chart-box"></div>
+        </el-card>
+      </el-col>
+
+      <el-col :xs="24" style="margin-bottom: 16px">
+        <el-card class="card overdue-card" shadow="never">
+          <div class="card-header">
+            <h3><el-icon color="#ef4444"><WarningFilled /></el-icon> 逾期未还提醒</h3>
+            <el-tag v-if="lendingStats.overdueReminders && lendingStats.overdueReminders.length > 0" type="danger" effect="dark" size="small">
+              {{ lendingStats.overdueReminders.length }} 件逾期
+            </el-tag>
+          </div>
+          <div v-if="lendingStats.overdueReminders && lendingStats.overdueReminders.length > 0" class="overdue-list">
+            <div
+              v-for="item in lendingStats.overdueReminders"
+              :key="item.id"
+              class="overdue-item"
+            >
+              <div class="overdue-icon">
+                <el-icon :size="20" color="#ef4444"><Warning /></el-icon>
+              </div>
+              <div class="overdue-info">
+                <div class="overdue-name">
+                  {{ item.jewelryName }}
+                  <el-tag type="danger" effect="dark" size="small">逾期{{ item.overdueDays }}天</el-tag>
+                </div>
+                <div class="overdue-meta">
+                  借用人: {{ item.borrowerName }} · 联系方式: {{ item.borrowerContact }} · 应还日期: {{ formatDate(item.expectedReturnDate) }}
+                </div>
+              </div>
+              <div class="overdue-days">
+                <div class="days-num" style="color: #ef4444">{{ item.overdueDays }}</div>
+                <div class="days-text">天逾期</div>
+              </div>
+            </div>
+          </div>
+          <el-empty v-else description="太棒了！暂无逾期记录" :image-size="80" />
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <el-divider content-position="left">
+      <span class="divider-title">
         <el-icon :size="20" color="#a855f7"><Warning /></el-icon>
         风险预警分析
       </span>
@@ -250,14 +359,17 @@ import {
   Rank,
   WarningFilled,
   DataAnalysis,
+  Van,
+  Money,
 } from '@element-plus/icons-vue';
 import { statsApi, jewelryApi } from '@/api';
-import type { AllStats, RiskStats } from '@/types';
+import type { AllStats, RiskStats, LendingStats } from '@/types';
 import { getRiskLevelInfo, getRiskTagType, getReminderTypeInfo } from '@/utils/risk';
 
 const idleDays = ref(30);
 const data = reactive<Partial<AllStats>>({});
 const riskStats = ref<Partial<RiskStats>>({});
+const lendingStats = reactive<Partial<LendingStats>>({});
 
 const maxComboCount = computed(() => {
   const items = data.topOutfitCombinations?.combinations || [];
@@ -268,26 +380,33 @@ const materialChartRef = ref<HTMLElement>();
 const problemChartRef = ref<HTMLElement>();
 const comboChartRef = ref<HTMLElement>();
 const riskMaterialChartRef = ref<HTMLElement>();
+const wearChartRef = ref<HTMLElement>();
 
 let materialChart: echarts.ECharts | null = null;
 let problemChart: echarts.ECharts | null = null;
 let comboChart: echarts.ECharts | null = null;
 let riskMaterialChart: echarts.ECharts | null = null;
+let wearChart: echarts.ECharts | null = null;
 
 const purplePalette = ['#a855f7', '#c084fc', '#e879f9', '#8b5cf6', '#7c3aed', '#6d28d9', '#5b21b6', '#4c1d95'];
 
 const loadData = async () => {
-  const [stats, risk] = await Promise.all([
+  const [stats, risk, lending] = await Promise.all([
     statsApi.all(idleDays.value),
     jewelryApi.getRiskStats().catch(() => null),
+    statsApi.lending().catch(() => null),
   ]);
   Object.assign(data, stats);
   if (risk) {
     riskStats.value = risk;
   }
+  if (lending) {
+    Object.assign(lendingStats, lending);
+  }
   await nextTick();
   renderCharts();
   renderRiskCharts();
+  renderLendingCharts();
 };
 
 const renderCharts = () => {
@@ -525,11 +644,68 @@ const renderRiskMaterialChart = () => {
   });
 };
 
+const renderLendingCharts = () => {
+  renderWearChart();
+};
+
+const renderWearChart = () => {
+  if (!wearChartRef.value) return;
+  if (!wearChart) {
+    wearChart = echarts.init(wearChartRef.value);
+  }
+  const items = lendingStats.wearDistribution || [];
+  const wearColors = ['#ef4444', '#10b981', '#3b82f6'];
+  wearChart.setOption({
+    tooltip: {
+      trigger: 'item',
+      formatter: '{b}: {c}次 ({d}%)',
+    },
+    legend: {
+      bottom: 0,
+      left: 'center',
+      icon: 'circle',
+      textStyle: { color: '#6b4c8a' },
+    },
+    color: wearColors,
+    series: [
+      {
+        name: '损耗分布',
+        type: 'pie',
+        radius: ['40%', '68%'],
+        center: ['50%', '42%'],
+        avoidLabelOverlap: false,
+        itemStyle: {
+          borderRadius: 8,
+          borderColor: '#fff',
+          borderWidth: 2,
+        },
+        label: {
+          show: true,
+          formatter: '{b}\n{c}次',
+          color: '#4c1d95',
+          fontSize: 12,
+        },
+        emphasis: {
+          label: {
+            show: true,
+            fontSize: 14,
+            fontWeight: 'bold',
+          },
+        },
+        data: items.length > 0
+          ? items.map((i, idx) => ({ name: i.type, value: i.count, itemStyle: { color: wearColors[idx % wearColors.length] } }))
+          : [{ name: '暂无数据', value: 1, itemStyle: { color: '#e5e7eb' }, label: { show: false } }],
+      },
+    ],
+  });
+};
+
 const handleResize = () => {
   materialChart?.resize();
   problemChart?.resize();
   comboChart?.resize();
   riskMaterialChart?.resize();
+  wearChart?.resize();
 };
 
 onMounted(async () => {
@@ -543,6 +719,7 @@ onBeforeUnmount(() => {
   problemChart?.dispose();
   comboChart?.dispose();
   riskMaterialChart?.dispose();
+  wearChart?.dispose();
 });
 </script>
 
@@ -961,5 +1138,65 @@ onBeforeUnmount(() => {
   font-size: 13px;
   color: #6b4c8a;
   line-height: 1.5;
+}
+
+.lending-ranking-card,
+.overdue-card {
+  min-height: 380px;
+  display: flex;
+  flex-direction: column;
+}
+
+.overdue-list {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.overdue-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: linear-gradient(135deg, #fef2f2, #fff);
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  margin-bottom: 10px;
+  transition: all 0.2s;
+}
+
+.overdue-item:hover {
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.12);
+}
+
+.overdue-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #fecaca, #f87171);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.overdue-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.overdue-name {
+  font-weight: 600;
+  color: #991b1b;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.overdue-meta {
+  font-size: 12px;
+  color: #7c3aed;
 }
 </style>

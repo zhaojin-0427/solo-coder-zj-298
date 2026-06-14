@@ -22,6 +22,17 @@ export class JewelryService {
         _count: {
           select: { outfits: true, maintenances: true, repairs: true },
         },
+        lendings: {
+          where: { status: { in: ['借出中', '逾期未还'] } },
+          take: 1,
+          orderBy: { lendDate: 'desc' },
+          select: {
+            id: true,
+            borrowerName: true,
+            expectedReturnDate: true,
+            status: true,
+          },
+        },
       },
     });
   }
@@ -33,6 +44,11 @@ export class JewelryService {
         outfits: { orderBy: { wearDate: 'desc' }, take: 10 },
         maintenances: { orderBy: { date: 'desc' }, take: 10 },
         repairs: { orderBy: { sendDate: 'desc' }, take: 10 },
+        lendings: {
+          where: { status: { in: ['借出中', '逾期未还'] } },
+          take: 1,
+          orderBy: { lendDate: 'desc' },
+        },
       },
     });
     if (!jewelry) throw new NotFoundException('首饰不存在');
