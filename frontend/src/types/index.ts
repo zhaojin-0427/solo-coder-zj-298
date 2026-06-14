@@ -518,3 +518,55 @@ export type AssetStatusTag = {
   label: string;
   type: 'danger' | 'warning' | 'success' | 'info';
 };
+
+export interface RiskScoreResult {
+  score: number;
+  level: RiskLevel;
+  levelText: string;
+  factors: RiskFactor[];
+  reminders: string[];
+}
+
+export interface JewelryStatusFlags {
+  isInRepair: boolean;
+  isLentOut: boolean;
+  isOverdue: boolean;
+  isLongIdle: boolean;
+  idleDays: number;
+  isUninsured: boolean;
+  isValuationExpired: boolean;
+  isMissingCredentials: boolean;
+  missingCredentialTypes: string[];
+  isInsuranceExpiring: boolean;
+  isInsuranceExpired: boolean;
+  insuranceDaysRemaining: number;
+  daysSinceValuation: number;
+  isHighRiskMaterial: boolean;
+  hasAllergyHistory: boolean;
+  hasFadingHistory: boolean;
+}
+
+export interface JewelryFullStatus {
+  risk: RiskScoreResult;
+  status: JewelryStatusFlags;
+  assetTags: AssetStatusTag[];
+  insuranceWarning: {
+    hasRisk: boolean;
+    warnings: string[];
+  };
+  availability: {
+    available: boolean;
+    reasons: string[];
+    statusInfo: {
+      lending: any;
+      repair: any;
+      riskScore: number;
+      riskLevel: RiskLevel;
+    };
+  };
+}
+
+export interface AvailabilityCheckOptions {
+  planDate?: Date;
+  includeRisk?: boolean;
+}

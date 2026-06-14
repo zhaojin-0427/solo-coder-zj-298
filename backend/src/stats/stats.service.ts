@@ -1,9 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
+import { UnifiedRiskStatusService } from '../common/unified-risk-status.service';
 
 @Injectable()
 export class StatsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private unifiedRiskService: UnifiedRiskStatusService,
+  ) {}
 
   async getScheduleStats(days: number = 30) {
     const now = new Date();
@@ -186,7 +190,7 @@ export class StatsService {
       });
 
       for (const item of selectedItems) {
-        const availability = await this.checkAvailability(item.jewelryId, planD);
+        const availability = await this.unifiedRiskService.checkAvailability(item.jewelryId, { planDate: planD });
         if (!availability.available) {
           for (const reason of availability.reasons) {
             let conflictType: any = 'high_risk';
@@ -240,83 +244,6 @@ export class StatsService {
       }
       return new Date(a.planDate).getTime() - new Date(b.planDate).getTime();
     });
-  }
-
-  private async checkAvailability(
-    jewelryId: number,
-    planDate: Date,
-  ): Promise<{ available: boolean; reasons: string[] }> {
-    const reasons: string[] = [];
-    const jewelry = await this.prisma.jewelry.findUnique({
-      where: { id: jewelryId },
-      include: {
-        lendings: {
-          where: { status: { in: ['借出中', '逾期未还'] } },
-          take: 5,
-        },
-        repairs: {
-          orderBy: { sendDate: 'desc' },
-          take: 10,
-        },
-        outfits: { orderBy: { wearDate: 'desc' }, take: 20 },
-      },
-    });
-
-    if (!jewelry) return { available: false, reasons: ['首饰不存在'] };
-
-    const activeLending = jewelry.lendings.find((l) => {
-      const lendStart = new Date(l.lendDate);
-      const expectedReturn = new Date(l.expectedReturnDate);
-      return planDate >= lendStart && planDate <= expectedReturn;
-    });
-    if (activeLending) {
-      if (activeLending.status === '逾期未还') {
-        reasons.push(`逾期未还：借给${activeLending.borrowerName}`);
-      } else {
-        reasons.push(`借出中：借给${activeLending.borrowerName}`);
-      }
-    }
-
-    const activeRepair = jewelry.repairs.find((r) => {
-      if (r.status !== '维修中' && r.status !== '待取件') return false;
-      const sendD = new Date(r.sendDate);
-      const returnD = r.returnDate ? new Date(r.returnDate) : new Date(sendD.getTime() + 30 * 24 * 60 * 60 * 1000);
-      return planDate >= sendD && planDate <= returnD;
-    });
-    if (activeRepair) {
-      if (activeRepair.status === '待取件') {
-        reasons.push('待取件：维修已完成');
-      } else {
-        reasons.push(`维修中：${activeRepair.problemType}`);
-      }
-    }
-
-    const { score } = this.calculateRiskScore(jewelry);
-    if (score >= 80) reasons.push(`极高风险：${score}分`);
-
-    return { available: reasons.length === 0, reasons };
-  }
-
-  private calculateRiskScore(jewelry: any): { score: number } {
-    let score = 0;
-    const allergicCount = jewelry.outfits?.filter((o: any) => o.isAllergic).length || 0;
-    score += allergicCount * 30;
-    const fadingCount = jewelry.outfits?.filter((o: any) => o.isFading).length || 0;
-    score += fadingCount * 20;
-    const pendingRepairs = jewelry.repairs?.filter(
-      (r: any) => r.status === '维修中' || r.status === '待取件',
-    ).length || 0;
-    score += pendingRepairs * 15;
-    const severeProblemTypes = new Set(['断裂', '断链', '掉钻', '严重变形']);
-    const severeProblems = jewelry.repairs?.filter((r: any) =>
-      severeProblemTypes.has(r.problemType),
-    ).length || 0;
-    score += severeProblems * 25;
-    const highRiskMaterials = new Set(['合金', '其他']);
-    if (highRiskMaterials.has(jewelry.material)) {
-      score += jewelry.material === '合金' ? 15 : 5;
-    }
-    return { score };
   }
 
   async getLendingStats() {

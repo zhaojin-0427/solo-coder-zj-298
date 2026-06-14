@@ -8,10 +8,11 @@ import { LendingModule } from './lending/lending.module';
 import { ScheduleModule } from './schedule/schedule.module';
 import { AssetModule } from './asset/asset.module';
 import { PrismaService } from './common/prisma.service';
+import { UnifiedRiskStatusService } from './common/unified-risk-status.service';
 
 @Module({
   imports: [JewelryModule, OutfitModule, MaintenanceModule, RepairModule, StatsModule, LendingModule, ScheduleModule, AssetModule],
-  providers: [PrismaService],
-  exports: [PrismaService],
+  providers: [PrismaService, UnifiedRiskStatusService],
+  exports: [PrismaService, UnifiedRiskStatusService],
 })
 export class AppModule {}

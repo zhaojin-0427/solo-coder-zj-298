@@ -347,7 +347,7 @@ import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'elem
 import { Plus, Delete, Present, Location, Calendar, Warning, Bell, CircleCheck, User, Wallet } from '@element-plus/icons-vue';
 import { jewelryApi } from '@/api';
 import type { Jewelry, RiskAssessment, FutureJewelryPlan } from '@/types';
-import { calculateRiskLocally, getRiskLevelInfo, getRiskTagType, generateAssetStatusTags } from '@/utils/risk';
+import { calculateRiskLocally, getRiskLevelInfo, getRiskTagType, generateAssetStatusTags, getCredentialCompleteness } from '@/utils/risk';
 
 const jewelryList = ref<Jewelry[]>([]);
 const dialogVisible = ref(false);
@@ -463,15 +463,6 @@ const showDetail = async (item: Jewelry) => {
 };
 
 const formatDate = (d: string) => d?.split('T')[0] || '';
-
-const getCredentialCompleteness = (credentials: any[]) => {
-  const requiredTypes = ['购买凭证', '鉴定证书'];
-  const existingTypes = new Set(credentials.map((c: any) => c.type));
-  const total = requiredTypes.length + existingTypes.size;
-  const matched = requiredTypes.filter((t) => existingTypes.has(t)).length;
-  const extra = [...existingTypes].filter((t) => !requiredTypes.includes(t)).length;
-  return Math.round(((matched + extra) / (requiredTypes.length + extra)) * 100) || 0;
-};
 
 onMounted(loadList);
 </script>

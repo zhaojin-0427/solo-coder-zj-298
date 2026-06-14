@@ -25,8 +25,8 @@
           </el-table-column>
           <el-table-column label="风险等级" width="100">
             <template #default="{ row }">
-              <el-tag v-if="row.currentValuation >= 10000 || row.purchasePrice >= 10000" type="danger" effect="dark" size="small">高风险</el-tag>
-              <el-tag v-else-if="row.currentValuation >= 5000 || row.purchasePrice >= 5000" type="warning" effect="dark" size="small">中风险</el-tag>
+              <el-tag v-if="row.currentValuation >= HIGH_VALUE_DISPLAY_THRESHOLD || row.purchasePrice >= HIGH_VALUE_DISPLAY_THRESHOLD" type="danger" effect="dark" size="small">高风险</el-tag>
+              <el-tag v-else-if="row.currentValuation >= HIGH_VALUE_THRESHOLD || row.purchasePrice >= HIGH_VALUE_THRESHOLD" type="warning" effect="dark" size="small">中风险</el-tag>
               <el-tag v-else type="info" effect="light" size="small">低风险</el-tag>
             </template>
           </el-table-column>
@@ -35,7 +35,7 @@
 
       <el-tab-pane label="即将到期保单" name="expiring">
         <div class="tab-header">
-          <h3>即将到期保单（30天内）</h3>
+          <h3>即将到期保单（{{ INSURANCE_WARNING_DAYS }}天内）</h3>
           <el-tag type="warning" effect="dark">{{ expiringPolicies.length }} 件即将到期</el-tag>
         </div>
         <el-table :data="expiringPolicies" size="small" empty-text="暂无即将到期保单">
@@ -341,11 +341,7 @@
         </el-form-item>
         <el-form-item label="凭证类型" prop="type" :rules="[{ required: true, message: '请选择凭证类型' }]">
           <el-select v-model="credentialForm.type" placeholder="选择类型" style="width: 100%">
-            <el-option label="购买凭证" value="购买凭证" />
-            <el-option label="鉴定证书" value="鉴定证书" />
-            <el-option label="发票" value="发票" />
-            <el-option label="保修卡" value="保修卡" />
-            <el-option label="其他" value="其他" />
+            <el-option v-for="opt in credentialTypeOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
           </el-select>
         </el-form-item>
         <el-form-item label="凭证编号">
@@ -373,10 +369,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, computed } from 'vue';
 import { ElMessage, ElMessageBox, type FormInstance } from 'element-plus';
 import { Plus } from '@element-plus/icons-vue';
 import { assetApi, jewelryApi } from '@/api';
+import {
+  HIGH_VALUE_THRESHOLD,
+  HIGH_VALUE_DISPLAY_THRESHOLD,
+  INSURANCE_WARNING_DAYS,
+  REQUIRED_CREDENTIAL_TYPES,
+} from '@/utils/risk';
 import type {
   Jewelry,
   Valuation,
@@ -391,6 +393,14 @@ import type {
 
 const activeTab = ref('uninsured');
 const jewelryList = ref<Jewelry[]>([]);
+
+const credentialTypeOptions = computed(() => [
+  { label: REQUIRED_CREDENTIAL_TYPES[0], value: REQUIRED_CREDENTIAL_TYPES[0] },
+  { label: REQUIRED_CREDENTIAL_TYPES[1], value: REQUIRED_CREDENTIAL_TYPES[1] },
+  { label: '发票', value: '发票' },
+  { label: '保修卡', value: '保修卡' },
+  { label: '其他', value: '其他' },
+]);
 
 const uninsuredList = ref<UninsuredJewelry[]>([]);
 const expiringPolicies = ref<ExpiringPolicy[]>([]);
@@ -468,7 +478,7 @@ const loadUninsured = async () => {
 };
 
 const loadExpiringPolicies = async () => {
-  const policies = await assetApi.getExpiringPolicies(30);
+  const policies = await assetApi.getExpiringPolicies(INSURANCE_WARNING_DAYS);
   expiringPolicies.value = policies.map((p: any) => ({
     id: p.id,
     name: p.jewelry?.name || '—',

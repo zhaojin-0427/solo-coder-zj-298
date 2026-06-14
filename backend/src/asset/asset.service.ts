@@ -1,5 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
+import { UnifiedRiskStatusService } from '../common/unified-risk-status.service';
+import {
+  REQUIRED_CREDENTIAL_TYPES,
+  VALUATION_EXPIRY_DAYS,
+  INSURANCE_WARNING_DAYS,
+  HIGH_VALUE_THRESHOLD,
+  HIGH_VALUE_DISPLAY_THRESHOLD,
+} from '../common/unified-risk.interface';
 import {
   CreateValuationDto,
   CreateInsuranceDto,
@@ -11,7 +19,10 @@ import {
 
 @Injectable()
 export class AssetService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private unifiedRiskService: UnifiedRiskStatusService,
+  ) {}
 
   async getValuations(jewelryId?: number) {
     const where = jewelryId ? { jewelryId } : {};
@@ -147,7 +158,10 @@ export class AssetService {
       },
     });
     return allJewelry
-      .filter((j) => j.insurances.length === 0)
+      .filter((j) => {
+        const flags = this.unifiedRiskService.calculateStatusFlags(j);
+        return flags.isUninsured;
+      })
       .map((j) => ({
         id: j.id,
         name: j.name,
@@ -158,7 +172,7 @@ export class AssetService {
       }));
   }
 
-  async getExpiringPolicies(days: number = 30) {
+  async getExpiringPolicies(days: number = INSURANCE_WARNING_DAYS) {
     const now = new Date();
     const cutoff = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
     return this.prisma.insurance.findMany({
@@ -173,7 +187,7 @@ export class AssetService {
     });
   }
 
-  async getExpiredValuations(days: number = 365) {
+  async getExpiredValuations(days: number = VALUATION_EXPIRY_DAYS) {
     const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
     const allJewelry = await this.prisma.jewelry.findMany({
       include: {
@@ -182,8 +196,8 @@ export class AssetService {
     });
     return allJewelry
       .filter((j) => {
-        if (j.valuations.length === 0) return true;
-        return new Date(j.valuations[0].valuationDate) < cutoff;
+        const flags = this.unifiedRiskService.calculateStatusFlags(j);
+        return flags.isValuationExpired;
       })
       .map((j) => ({
         id: j.id,
@@ -198,27 +212,24 @@ export class AssetService {
     const allJewelry = await this.prisma.jewelry.findMany({
       include: { credentials: true },
     });
-    const requiredTypes = ['购买凭证', '鉴定证书'];
     return allJewelry
       .filter((j) => {
-        const existingTypes = new Set(j.credentials.map((c) => c.type));
-        return requiredTypes.some((t) => !existingTypes.has(t));
+        const flags = this.unifiedRiskService.calculateStatusFlags(j);
+        return flags.isMissingCredentials;
       })
       .map((j) => {
-        const missing = requiredTypes.filter(
-          (t) => !new Set(j.credentials.map((c) => c.type)).has(t),
-        );
+        const flags = this.unifiedRiskService.calculateStatusFlags(j);
         return {
           id: j.id,
           name: j.name,
           material: j.material,
-          missingTypes: missing,
+          missingTypes: flags.missingCredentialTypes,
           existingCredentialTypes: j.credentials.map((c) => c.type),
         };
       });
   }
 
-  async getHighValueJewelry(threshold: number = 10000) {
+  async getHighValueJewelry(threshold: number = HIGH_VALUE_DISPLAY_THRESHOLD) {
     const allJewelry = await this.prisma.jewelry.findMany({
       include: {
         valuations: { orderBy: { valuationDate: 'desc' }, take: 1 },
@@ -233,14 +244,17 @@ export class AssetService {
         const val = j.valuations[0]?.currentValue || j.purchasePrice || 0;
         return val >= threshold;
       })
-      .map((j) => ({
-        id: j.id,
-        name: j.name,
-        material: j.material,
-        currentValue: j.valuations[0]?.currentValue || j.purchasePrice || 0,
-        isInsured: j.insurances.length > 0,
-        lastValuationDate: j.valuations[0]?.valuationDate || null,
-      }))
+      .map((j) => {
+        const flags = this.unifiedRiskService.calculateStatusFlags(j);
+        return {
+          id: j.id,
+          name: j.name,
+          material: j.material,
+          currentValue: j.valuations[0]?.currentValue || j.purchasePrice || 0,
+          isInsured: !flags.isUninsured,
+          lastValuationDate: j.valuations[0]?.valuationDate || null,
+        };
+      })
       .sort((a, b) => b.currentValue - a.currentValue);
   }
 
@@ -259,7 +273,6 @@ export class AssetService {
     let totalValuation = 0;
     const materialValuationMap = new Map<string, { total: number; count: number }>();
     let insuredCount = 0;
-    let totalJewelryWithValuation = 0;
     const highValueHighRisk: Array<{
       id: number;
       name: string;
@@ -280,67 +293,51 @@ export class AssetService {
     }> = [];
 
     let missingCredentialCount = 0;
-    const requiredTypes = ['购买凭证', '鉴定证书'];
 
     for (const j of allJewelry) {
       const val = j.valuations[0]?.currentValue || j.purchasePrice || 0;
       totalValuation += val;
-      if (val > 0) totalJewelryWithValuation++;
 
       const existing = materialValuationMap.get(j.material) || { total: 0, count: 0 };
       existing.total += val;
       existing.count += 1;
       materialValuationMap.set(j.material, existing);
 
-      if (j.insurances.length > 0) {
+      const flags = this.unifiedRiskService.calculateStatusFlags(j);
+
+      if (!flags.isUninsured) {
         insuredCount++;
-        const insurance = j.insurances[0];
-        const daysRemaining = Math.floor(
-          (new Date(insurance.endDate).getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
-        );
-        if (daysRemaining <= 30 && daysRemaining >= 0) {
-          expiringPolicies.push({
-            id: insurance.id,
-            name: j.name,
-            policyNumber: insurance.policyNumber,
-            insuranceCompany: insurance.insuranceCompany,
-            endDate: insurance.endDate.toISOString(),
-            daysRemaining,
-          });
-        }
       }
 
-      const existingTypes = new Set(j.credentials.map((c) => c.type));
-      if (requiredTypes.some((t) => !existingTypes.has(t))) {
+      if (flags.isInsuranceExpiring && flags.insuranceDaysRemaining >= 0 && j.insurances[0]) {
+        expiringPolicies.push({
+          id: j.insurances[0].id,
+          name: j.name,
+          policyNumber: j.insurances[0].policyNumber,
+          insuranceCompany: j.insurances[0].insuranceCompany,
+          endDate: j.insurances[0].endDate.toISOString(),
+          daysRemaining: flags.insuranceDaysRemaining,
+        });
+      }
+
+      if (flags.isMissingCredentials) {
         missingCredentialCount++;
       }
 
       const riskFactors: string[] = [];
-      if (!j.insurances.length && val >= 5000) riskFactors.push('高价值未投保');
-      if (j.insurances.length) {
-        const ins = j.insurances[0];
-        const days = Math.floor(
-          (new Date(ins.endDate).getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
-        );
-        if (days < 0) riskFactors.push('保单已过期');
-        else if (days <= 30) riskFactors.push('保单即将到期');
-      }
-      if (j.valuations.length) {
-        const lastValDate = new Date(j.valuations[0].valuationDate);
-        const daysSince = Math.floor(
-          (now.getTime() - lastValDate.getTime()) / (1000 * 60 * 60 * 24),
-        );
-        if (daysSince > 365) riskFactors.push('估值已过期');
-      } else if (val === 0) {
-        riskFactors.push('无估值记录');
-      }
-      if (riskFactors.length > 0 && val >= 5000) {
+      if (flags.isUninsured && val >= HIGH_VALUE_THRESHOLD) riskFactors.push('高价值未投保');
+      if (flags.isInsuranceExpired) riskFactors.push('保单已过期');
+      else if (flags.isInsuranceExpiring) riskFactors.push('保单即将到期');
+      if (flags.isValuationExpired) riskFactors.push('估值已过期');
+      else if ((j.valuations || []).length === 0 && val === 0) riskFactors.push('无估值记录');
+
+      if (riskFactors.length > 0 && val >= HIGH_VALUE_THRESHOLD) {
         highValueHighRisk.push({
           id: j.id,
           name: j.name,
           material: j.material,
           currentValue: val,
-          isInsured: j.insurances.length > 0,
+          isInsured: !flags.isUninsured,
           riskFactors,
         });
       }
@@ -428,25 +425,25 @@ export class AssetService {
     });
     if (!jewelry) throw new NotFoundException('首饰不存在');
 
-    const now = new Date();
+    const flags = this.unifiedRiskService.calculateStatusFlags(jewelry);
     const latestValuation = jewelry.valuations[0] || null;
     const activeInsurance = jewelry.insurances.find((i) => i.status === '生效中') || null;
 
-    let valuationExpired = false;
-    if (latestValuation) {
-      const daysSince = Math.floor(
-        (now.getTime() - new Date(latestValuation.valuationDate).getTime()) / (1000 * 60 * 60 * 24),
-      );
-      valuationExpired = daysSince > 365;
-    } else {
-      valuationExpired = true;
-    }
-
-    const requiredTypes = ['购买凭证', '鉴定证书'];
     const existingTypes = new Set(jewelry.credentials.map((c) => c.type));
     const credentialCompleteness = Math.round(
-      (existingTypes.size / (existingTypes.size + requiredTypes.filter((t) => !existingTypes.has(t)).length)) * 100,
+      (existingTypes.size / (existingTypes.size + REQUIRED_CREDENTIAL_TYPES.filter((t) => !existingTypes.has(t)).length)) * 100,
     );
+
+    let insuranceStatus: string;
+    if (flags.isUninsured) {
+      insuranceStatus = '未投保';
+    } else if (flags.isInsuranceExpired) {
+      insuranceStatus = '已过期';
+    } else if (flags.isInsuranceExpiring) {
+      insuranceStatus = '即将到期';
+    } else {
+      insuranceStatus = '生效中';
+    }
 
     return {
       jewelryId: jewelry.id,
@@ -456,18 +453,9 @@ export class AssetService {
       latestValuation,
       activeInsurance,
       credentials: jewelry.credentials,
-      valuationExpired,
+      valuationExpired: flags.isValuationExpired,
       credentialCompleteness,
-      insuranceStatus: activeInsurance
-        ? (() => {
-            const days = Math.floor(
-              (new Date(activeInsurance.endDate).getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
-            );
-            if (days < 0) return '已过期';
-            if (days <= 30) return '即将到期';
-            return '生效中';
-          })()
-        : '未投保',
+      insuranceStatus,
     };
   }
 }

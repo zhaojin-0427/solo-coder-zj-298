@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
+import { UnifiedRiskStatusService } from '../common/unified-risk-status.service';
 import type {
   RiskAssessment,
   RiskFactor,
@@ -12,22 +13,10 @@ import type {
 
 @Injectable()
 export class RiskService {
-  constructor(private prisma: PrismaService) {}
-
-  private getRiskLevel(score: number): { level: RiskLevel; levelText: string } {
-    if (score >= 80) return { level: 'critical', levelText: '极高风险' };
-    if (score >= 51) return { level: 'high', levelText: '高风险' };
-    if (score >= 21) return { level: 'medium', levelText: '中风险' };
-    return { level: 'low', levelText: '低风险' };
-  }
-
-  private getSevereProblemTypes(): Set<string> {
-    return new Set(['断裂', '断链', '掉钻', '严重变形']);
-  }
-
-  private getHighRiskMaterials(): Set<string> {
-    return new Set(['合金', '其他']);
-  }
+  constructor(
+    private prisma: PrismaService,
+    private unifiedRiskService: UnifiedRiskStatusService,
+  ) {}
 
   async assessJewelry(jewelryId: number): Promise<RiskAssessment> {
     const jewelry = await this.prisma.jewelry.findUnique({
@@ -43,195 +32,17 @@ export class RiskService {
       throw new Error('首饰不存在');
     }
 
-    const factors: RiskFactor[] = [];
-    let totalScore = 0;
-
-    const allergicCount = jewelry.outfits.filter((o) => o.isAllergic).length;
-    if (allergicCount > 0) {
-      const score = allergicCount * 30;
-      totalScore += score;
-      factors.push({
-        type: 'allergy',
-        score,
-        description: `记录过${allergicCount}次过敏反应，每次+30分`,
-      });
-    }
-
-    const fadingCount = jewelry.outfits.filter((o) => o.isFading).length;
-    if (fadingCount > 0) {
-      const score = fadingCount * 20;
-      totalScore += score;
-      factors.push({
-        type: 'fading',
-        score,
-        description: `记录过${fadingCount}次掉色，每次+20分`,
-      });
-    }
-
-    const needCleaningCount = jewelry.outfits.filter(
-      (o) => o.cleanStatus === '待专业清洁',
-    ).length;
-    if (needCleaningCount > 0) {
-      const score = needCleaningCount * 10;
-      totalScore += score;
-      factors.push({
-        type: 'cleaning',
-        score,
-        description: `有${needCleaningCount}次记录待专业清洁，每次+10分`,
-      });
-    }
-
-    const severeProblems = jewelry.repairs.filter((r) =>
-      this.getSevereProblemTypes().has(r.problemType),
-    );
-    if (severeProblems.length > 0) {
-      const score = severeProblems.length * 25;
-      totalScore += score;
-      factors.push({
-        type: 'severe_repair',
-        score,
-        description: `有${severeProblems.length}次严重维修记录（${severeProblems.map((p) => p.problemType).join('、')}），每次+25分`,
-      });
-    }
-
-    const pendingRepairs = jewelry.repairs.filter(
-      (r) => r.status === '维修中' || r.status === '待取件',
-    );
-    if (pendingRepairs.length > 0) {
-      const score = pendingRepairs.length * 15;
-      totalScore += score;
-      factors.push({
-        type: 'pending_repair',
-        score,
-        description: `有${pendingRepairs.length}件维修未完成，每件+15分`,
-      });
-    }
-
-    const highCostRepairs = jewelry.repairs.filter((r) => r.cost >= 500);
-    if (highCostRepairs.length > 0) {
-      const score = highCostRepairs.length * 20;
-      totalScore += score;
-      factors.push({
-        type: 'high_cost',
-        score,
-        description: `有${highCostRepairs.length}次高额维修（≥500元），每次+20分`,
-      });
-    }
-
-    const now = new Date();
-    let idleDays = 0;
-    if (jewelry._count.outfits === 0) {
-      idleDays = Math.floor(
-        (now.getTime() - new Date(jewelry.purchaseDate).getTime()) /
-          (1000 * 60 * 60 * 24),
-      );
-    } else {
-      const lastWear = jewelry.outfits[0]?.wearDate;
-      if (lastWear) {
-        idleDays = Math.floor(
-          (now.getTime() - new Date(lastWear).getTime()) /
-            (1000 * 60 * 60 * 24),
-        );
-      }
-    }
-    if (idleDays >= 90) {
-      totalScore += 25;
-      factors.push({
-        type: 'idle',
-        score: 25,
-        description: `已闲置${idleDays}天（≥90天），+25分`,
-      });
-    } else if (idleDays >= 60) {
-      totalScore += 15;
-      factors.push({
-        type: 'idle',
-        score: 15,
-        description: `已闲置${idleDays}天（≥60天），+15分`,
-      });
-    } else if (idleDays >= 30) {
-      totalScore += 5;
-      factors.push({
-        type: 'idle',
-        score: 5,
-        description: `已闲置${idleDays}天（≥30天），+5分`,
-      });
-    }
-
-    if (this.getHighRiskMaterials().has(jewelry.material)) {
-      const score = jewelry.material === '合金' ? 15 : 5;
-      totalScore += score;
-      factors.push({
-        type: 'material',
-        score,
-        description: `${jewelry.material}材质属于高风险材质，+${score}分`,
-      });
-    }
-
-    const { level, levelText } = this.getRiskLevel(totalScore);
-    const reminders = this.generateReminders(factors, jewelry);
+    const riskResult = this.unifiedRiskService.calculateRiskScore(jewelry);
 
     return {
       jewelryId: jewelry.id,
       jewelryName: jewelry.name,
-      level,
-      levelText,
-      score: totalScore,
-      factors,
-      reminders,
+      level: riskResult.level as RiskLevel,
+      levelText: riskResult.levelText,
+      score: riskResult.score,
+      factors: riskResult.factors as RiskFactor[],
+      reminders: riskResult.reminders,
     };
-  }
-
-  private generateReminders(
-    factors: RiskFactor[],
-    jewelry: any,
-  ): string[] {
-    const reminders: string[] = [];
-
-    const allergyFactor = factors.find((f) => f.type === 'allergy');
-    if (allergyFactor) {
-      reminders.push('⚠️ 该首饰曾引起过敏反应，建议减少佩戴或避免直接接触皮肤');
-    }
-
-    const fadingFactor = factors.find((f) => f.type === 'fading');
-    if (fadingFactor) {
-      reminders.push('⚠️ 该首饰存在掉色问题，建议进行专业保养或减少佩戴频率');
-    }
-
-    const cleaningFactor = factors.find((f) => f.type === 'cleaning');
-    if (cleaningFactor) {
-      reminders.push('🧹 该首饰需要专业清洁，建议尽快送店保养');
-    }
-
-    const severeRepairFactor = factors.find((f) => f.type === 'severe_repair');
-    if (severeRepairFactor) {
-      reminders.push('🔧 该首饰曾发生严重损坏，建议定期检查结构完整性');
-    }
-
-    const pendingRepairFactor = factors.find((f) => f.type === 'pending_repair');
-    if (pendingRepairFactor) {
-      reminders.push('📦 该首饰有维修尚未完成，请及时跟进处理');
-    }
-
-    const highCostFactor = factors.find((f) => f.type === 'high_cost');
-    if (highCostFactor) {
-      reminders.push('💰 该首饰维修成本较高，建议平时小心佩戴以减少损坏风险');
-    }
-
-    const idleFactor = factors.find((f) => f.type === 'idle');
-    if (idleFactor) {
-      reminders.push('📅 该首饰已长期闲置，建议定期检查保养状态或考虑转送他人');
-    }
-
-    const materialFactor = factors.find((f) => f.type === 'material');
-    if (materialFactor) {
-      reminders.push('⚠️ 该首饰材质稳定性较差，建议避免接触汗水、香水等腐蚀性物质');
-    }
-
-    if (reminders.length === 0) {
-      reminders.push('✅ 该首饰状态良好，继续保持定期清洁和妥善存放');
-    }
-
-    return reminders;
   }
 
   async assessAllJewelry(): Promise<RiskAssessment[]> {

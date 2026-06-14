@@ -1,149 +1,21 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
+import { UnifiedRiskStatusService } from '../common/unified-risk-status.service';
 import { CreateWearPlanDto, ConfirmWearPlanDto, ResolveConflictDto } from './dto';
 import type { JewelryRecommendation, RecommendationFactor, ScheduleConflict, WearPlanDetail, PlanItemDetail } from './dto';
 
 @Injectable()
 export class ScheduleService {
-  constructor(private prisma: PrismaService) {}
-
-  private getRiskLevel(score: number): { level: string; levelText: string } {
-    if (score >= 80) return { level: 'critical', levelText: '极高风险' };
-    if (score >= 51) return { level: 'high', levelText: '高风险' };
-    if (score >= 21) return { level: 'medium', levelText: '中风险' };
-    return { level: 'low', levelText: '低风险' };
-  }
-
-  private calculateRiskScore(jewelry: any): { score: number; factors: string[]; reminders: string[] } {
-    let score = 0;
-    const factors: string[] = [];
-    const reminders: string[] = [];
-
-    const allergicCount = jewelry.outfits?.filter((o: any) => o.isAllergic).length || 0;
-    if (allergicCount > 0) {
-      score += allergicCount * 30;
-      factors.push(`过敏${allergicCount}次`);
-      reminders.push(`曾引起${allergicCount}次过敏反应`);
-    }
-
-    const fadingCount = jewelry.outfits?.filter((o: any) => o.isFading).length || 0;
-    if (fadingCount > 0) {
-      score += fadingCount * 20;
-      factors.push(`掉色${fadingCount}次`);
-      reminders.push(`存在${fadingCount}次掉色记录`);
-    }
-
-    const pendingRepairs = jewelry.repairs?.filter(
-      (r: any) => r.status === '维修中' || r.status === '待取件',
-    ).length || 0;
-    if (pendingRepairs > 0) {
-      score += pendingRepairs * 15;
-      factors.push(`待处理维修${pendingRepairs}件`);
-      reminders.push(`${pendingRepairs}件维修未完成`);
-    }
-
-    const severeProblemTypes = new Set(['断裂', '断链', '掉钻', '严重变形']);
-    const severeProblems = jewelry.repairs?.filter((r: any) =>
-      severeProblemTypes.has(r.problemType),
-    ).length || 0;
-    if (severeProblems > 0) {
-      score += severeProblems * 25;
-      factors.push(`严重维修${severeProblems}次`);
-      reminders.push(`曾发生${severeProblems}次严重损坏`);
-    }
-
-    const highRiskMaterials = new Set(['合金', '其他']);
-    if (highRiskMaterials.has(jewelry.material)) {
-      score += jewelry.material === '合金' ? 15 : 5;
-      factors.push(`${jewelry.material}高风险材质`);
-      reminders.push(`${jewelry.material}材质稳定性较差`);
-    }
-
-    const now = new Date();
-    let idleDays = 0;
-    if (!jewelry.outfits || jewelry.outfits.length === 0) {
-      idleDays = Math.floor((now.getTime() - new Date(jewelry.purchaseDate).getTime()) / (1000 * 60 * 60 * 24));
-    } else {
-      const lastWear = jewelry.outfits[0]?.wearDate;
-      if (lastWear) {
-        idleDays = Math.floor((now.getTime() - new Date(lastWear).getTime()) / (1000 * 60 * 60 * 24));
-      }
-    }
-    if (idleDays >= 90) {
-      score += 25;
-      factors.push(`闲置${idleDays}天`);
-      reminders.push(`已闲置${idleDays}天`);
-    } else if (idleDays >= 60) {
-      score += 15;
-      factors.push(`闲置${idleDays}天`);
-      reminders.push(`已闲置${idleDays}天`);
-    }
-
-    return { score, factors, reminders };
-  }
+  constructor(
+    private prisma: PrismaService,
+    private unifiedRiskService: UnifiedRiskStatusService,
+  ) {}
 
   async checkAvailability(
     jewelryId: number,
     planDate: Date,
   ): Promise<{ available: boolean; reasons: string[]; statusInfo: any }> {
-    const reasons: string[] = [];
-    const jewelry = await this.prisma.jewelry.findUnique({
-      where: { id: jewelryId },
-      include: {
-        lendings: {
-          where: { status: { in: ['借出中', '逾期未还'] } },
-          orderBy: { lendDate: 'desc' },
-          take: 5,
-        },
-        repairs: {
-          where: { status: { in: ['维修中', '待取件'] } },
-          orderBy: { sendDate: 'desc' },
-          take: 5,
-        },
-      },
-    });
-
-    if (!jewelry) {
-      return { available: false, reasons: ['首饰不存在'], statusInfo: null };
-    }
-
-    const activeLending = jewelry.lendings.find((l) => {
-      const lendStart = new Date(l.lendDate);
-      const expectedReturn = new Date(l.expectedReturnDate);
-      return planDate >= lendStart && planDate <= expectedReturn;
-    });
-    if (activeLending) {
-      if (activeLending.status === '逾期未还') {
-        reasons.push(`逾期未还：借给${activeLending.borrowerName}，应于${new Date(activeLending.expectedReturnDate).toLocaleDateString('zh-CN')}归还`);
-      } else {
-        reasons.push(`借出中：借给${activeLending.borrowerName}，预计${new Date(activeLending.expectedReturnDate).toLocaleDateString('zh-CN')}归还`);
-      }
-    }
-
-    const activeRepair = jewelry.repairs.find((r) => {
-      const sendD = new Date(r.sendDate);
-      const returnD = r.returnDate ? new Date(r.returnDate) : new Date(sendD.getTime() + 30 * 24 * 60 * 60 * 1000);
-      return planDate >= sendD && planDate <= returnD;
-    });
-    if (activeRepair) {
-      if (activeRepair.status === '待取件') {
-        reasons.push(`待取件：${activeRepair.problemType}维修已完成，请尽快取回`);
-      } else {
-        reasons.push(`维修中：${activeRepair.problemType}，预计${activeRepair.returnDate ? new Date(activeRepair.returnDate).toLocaleDateString('zh-CN') : '待定'}可取回`);
-      }
-    }
-
-    const { score } = this.calculateRiskScore(jewelry);
-    const { level } = this.getRiskLevel(score);
-    if (level === 'critical') {
-      reasons.push(`极高风险：风险评分${score}分，强烈不建议佩戴`);
-    }
-
-    return {
-      available: reasons.length === 0,
-      reasons,
-      statusInfo: { lending: jewelry.lendings[0] || null, repair: jewelry.repairs[0] || null, riskScore: score, riskLevel: level },
-    };
+    return this.unifiedRiskService.checkAvailability(jewelryId, { planDate });
   }
 
   async generateRecommendations(
@@ -194,8 +66,12 @@ export class ScheduleService {
       const unavailableReasons: string[] = [];
       const allReminders: string[] = [];
 
-      const { score: riskScore, factors: riskFactors, reminders } = this.calculateRiskScore(jewelry);
-      const { level: riskLevel, levelText: riskLevelText } = this.getRiskLevel(riskScore);
+      const riskResult = this.unifiedRiskService.calculateRiskScore(jewelry);
+      const riskScore = riskResult.score;
+      const riskLevel = riskResult.level;
+      const riskLevelText = riskResult.levelText;
+      const riskFactors = riskResult.factors.map((f: any) => f.description);
+      const reminders = riskResult.reminders;
       allReminders.push(...reminders);
 
       const riskPenalty = Math.min(riskScore, 40);
@@ -625,11 +501,19 @@ export class ScheduleService {
     } else {
       const planD = new Date(plan.planDate);
       const availability = await this.checkAvailability(dto.newJewelryId, planD);
-      const jewelry = await this.prisma.jewelry.findUnique({ where: { id: dto.newJewelryId } });
+      const jewelry = await this.prisma.jewelry.findUnique({
+        where: { id: dto.newJewelryId },
+        include: {
+          outfits: { orderBy: { wearDate: 'desc' }, take: 20 },
+          repairs: { orderBy: { sendDate: 'desc' }, take: 10 },
+        },
+      });
       if (!jewelry) throw new NotFoundException('新首饰不存在');
 
-      const { score: riskScore } = this.calculateRiskScore(jewelry);
-      const { level, levelText } = this.getRiskLevel(riskScore);
+      const riskResult = this.unifiedRiskService.calculateRiskScore(jewelry);
+      const riskScore = riskResult.score;
+      const level = riskResult.level;
+      const levelText = riskResult.levelText;
 
       await this.prisma.wearPlanItem.create({
         data: {
