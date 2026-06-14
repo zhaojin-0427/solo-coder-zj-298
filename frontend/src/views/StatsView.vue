@@ -70,6 +70,44 @@
         </el-card>
       </el-col>
       <el-col :xs="24" :md="12" style="margin-bottom: 16px">
+        <el-card class="card combo-card" shadow="never">
+          <div class="card-header">
+            <h3><el-icon color="#8b5cf6"><CollectionTag /></el-icon> 高频搭配组合 TOP10</h3>
+          </div>
+          <div v-if="data.topOutfitCombinations?.combinations?.length > 0" class="combo-list">
+            <div
+              v-for="(item, idx) in data.topOutfitCombinations.combinations"
+              :key="item.combination"
+              class="combo-item"
+            >
+              <div class="combo-rank" :class="'rank-' + (idx + 1)">{{ idx + 1 }}</div>
+              <div class="combo-content">
+                <div class="combo-tags">
+                  <el-tag
+                    v-for="tag in item.combination.split(' + ')"
+                    :key="tag"
+                    size="small"
+                    effect="light"
+                    style="margin-right: 4px; margin-bottom: 2px"
+                  >{{ tag }}</el-tag>
+                </div>
+                <div class="combo-bar-bg">
+                  <div
+                    class="combo-bar"
+                    :style="{
+                      width: (item.count / maxComboCount) * 100 + '%',
+                      background: 'linear-gradient(90deg, #c084fc, #a855f7)'
+                    }"
+                  ></div>
+                </div>
+              </div>
+              <div class="combo-count">{{ item.count }}次</div>
+            </div>
+          </div>
+          <el-empty v-else description="暂无搭配组合数据" :image-size="80" />
+        </el-card>
+      </el-col>
+      <el-col :xs="24" :md="12" style="margin-bottom: 16px">
         <el-card class="card idle-card" shadow="never">
           <div class="card-header">
             <h3><el-icon color="#f59e0b"><Bell /></el-icon> 长期闲置首饰</h3>
@@ -90,11 +128,14 @@
                 <div class="idle-name">
                   {{ item.name }}
                   <el-tag size="small" effect="plain">{{ item.material }}</el-tag>
+                  <el-tag v-if="item.totalWears === 0" type="danger" effect="light" size="small" style="margin-left: 4px">
+                    从未佩戴
+                  </el-tag>
                 </div>
                 <div class="idle-meta">
                   <span v-if="item.lastWearDate">上次佩戴: {{ formatDate(item.lastWearDate) }}</span>
-                  <span v-else>从未佩戴</span>
-                  <span> · 共{{ item.totalWears }}次佩戴</span>
+                  <span v-else style="color: #dc2626; font-weight: 500">⚠️ 购买后从未佩戴</span>
+                  <span v-if="item.totalWears > 0"> · 共{{ item.totalWears }}次佩戴</span>
                 </div>
               </div>
               <div class="idle-days">
@@ -111,7 +152,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onBeforeUnmount, nextTick, watch } from 'vue';
+import { ref, reactive, onMounted, onBeforeUnmount, nextTick, watch, computed } from 'vue';
 import * as echarts from 'echarts';
 import {
   Present,
@@ -122,12 +163,18 @@ import {
   Warning,
   TrendCharts,
   Bell,
+  CollectionTag,
 } from '@element-plus/icons-vue';
 import { statsApi } from '@/api';
 import type { AllStats } from '@/types';
 
 const idleDays = ref(30);
 const data = reactive<Partial<AllStats>>({});
+
+const maxComboCount = computed(() => {
+  const items = data.topOutfitCombinations?.combinations || [];
+  return items.length > 0 ? Math.max(...items.map((i) => i.count)) : 1;
+});
 
 const materialChartRef = ref<HTMLElement>();
 const problemChartRef = ref<HTMLElement>();
@@ -264,7 +311,7 @@ const renderComboChart = () => {
   if (!comboChart) {
     comboChart = echarts.init(comboChartRef.value);
   }
-  const items = (data.topOutfitCombinations || []).slice(0, 10);
+  const items = (data.topOutfitCombinations?.singleTags || []).slice(0, 10);
   const names = items.map((i) => i.tag).reverse();
   const counts = items.map((i) => i.count).reverse();
   comboChart.setOption({
@@ -474,5 +521,92 @@ onBeforeUnmount(() => {
   font-size: 11px;
   color: #92400e;
   margin-top: 2px;
+}
+
+.combo-card {
+  height: 380px;
+  display: flex;
+  flex-direction: column;
+}
+
+.combo-list {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.combo-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: linear-gradient(135deg, #faf5ff, #fff);
+  border: 1px solid #e9d5ff;
+  border-radius: 10px;
+  margin-bottom: 8px;
+  transition: all 0.2s;
+}
+
+.combo-item:hover {
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.12);
+}
+
+.combo-rank {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: #e9d5ff;
+  color: #6d28d9;
+  font-weight: 700;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.combo-rank.rank-1 {
+  background: linear-gradient(135deg, #fde047, #f59e0b);
+  color: #fff;
+}
+
+.combo-rank.rank-2 {
+  background: linear-gradient(135deg, #e5e7eb, #9ca3af);
+  color: #fff;
+}
+
+.combo-rank.rank-3 {
+  background: linear-gradient(135deg, #fed7aa, #ea580c);
+  color: #fff;
+}
+
+.combo-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.combo-tags {
+  margin-bottom: 6px;
+}
+
+.combo-bar-bg {
+  height: 6px;
+  background: #f3e8ff;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.combo-bar {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+.combo-count {
+  flex-shrink: 0;
+  font-weight: 600;
+  color: #7c3aed;
+  font-size: 14px;
 }
 </style>

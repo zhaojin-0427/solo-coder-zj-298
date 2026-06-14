@@ -41,20 +41,31 @@ export class StatsService {
     const outfits = await this.prisma.outfit.findMany({
       select: { outfitTags: true },
     });
-    const map = new Map<string, number>();
+    const combinationMap = new Map<string, number>();
+    const singleTagMap = new Map<string, number>();
     for (const o of outfits) {
       const tags = o.outfitTags
         .split(/[,，、\s]+/)
         .map((t) => t.trim())
         .filter((t) => t.length > 0);
       tags.forEach((tag) => {
-        map.set(tag, (map.get(tag) || 0) + 1);
+        singleTagMap.set(tag, (singleTagMap.get(tag) || 0) + 1);
       });
+      if (tags.length >= 2) {
+        const sortedTags = [...tags].sort();
+        const key = sortedTags.join(' + ');
+        combinationMap.set(key, (combinationMap.get(key) || 0) + 1);
+      }
     }
-    return Array.from(map.entries())
+    const combinations = Array.from(combinationMap.entries())
+      .map(([combination, count]) => ({ combination, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+    const singleTags = Array.from(singleTagMap.entries())
       .map(([tag, count]) => ({ tag, count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 15);
+    return { combinations, singleTags };
   }
 
   async getLongIdleJewelry(days: number = 30) {
@@ -74,7 +85,7 @@ export class StatsService {
     return allJewelry
       .filter((j) => {
         if (j._count.outfits === 0) {
-          return new Date(j.createdAt) < threshold;
+          return new Date(j.purchaseDate) < threshold;
         }
         const lastWear = j.outfits[0]?.wearDate;
         return lastWear && new Date(lastWear) < threshold;
@@ -86,7 +97,7 @@ export class StatsService {
         lastWearDate: j.outfits[0]?.wearDate || null,
         totalWears: j._count.outfits,
         idleDays: j._count.outfits === 0
-          ? Math.floor((now.getTime() - new Date(j.createdAt).getTime()) / (1000 * 60 * 60 * 24))
+          ? Math.floor((now.getTime() - new Date(j.purchaseDate).getTime()) / (1000 * 60 * 60 * 24))
           : Math.floor((now.getTime() - new Date(j.outfits[0].wearDate).getTime()) / (1000 * 60 * 60 * 24)),
       }))
       .sort((a, b) => b.idleDays - a.idleDays);

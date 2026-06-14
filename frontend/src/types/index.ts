@@ -89,6 +89,16 @@ export interface OutfitCombination {
   count: number;
 }
 
+export interface OutfitComboPair {
+  combination: string;
+  count: number;
+}
+
+export interface TopCombinationsData {
+  combinations: OutfitComboPair[];
+  singleTags: OutfitCombination[];
+}
+
 export interface IdleJewelry {
   id: number;
   name: string;
@@ -102,6 +112,6 @@ export interface AllStats {
   overview: StatsOverview;
   materialWearFrequency: MaterialFrequency[];
   problemDistribution: ProblemDistribution[];
-  topOutfitCombinations: OutfitCombination[];
+  topOutfitCombinations: TopCombinationsData;
   longIdleJewelry: IdleJewelry[];
 }

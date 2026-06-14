@@ -45,11 +45,14 @@
       </el-table-column>
       <el-table-column label="穿搭标签">
         <template #default="{ row }">
-          <span
+          <el-tag
             v-for="tag in parseTags(row.outfitTags)"
             :key="tag"
-            class="tag-item"
-          >{{ tag }}</span>
+            size="small"
+            effect="light"
+            type="success"
+            style="margin-right: 6px; margin-bottom: 4px"
+          >{{ tag }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column label="过敏" width="80">
